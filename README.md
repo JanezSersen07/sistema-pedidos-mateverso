@@ -1,51 +1,45 @@
-# Sistema de pedidos Mateverso
+# Sistema de ventas Mateverso
 
-Aplicación de consola en **C#** para registrar y seguir los pedidos de un emprendimiento de mates: carga de clientes, productos con stock, estados del pedido y resumen de ventas. Los productos y precios son de ejemplo..
+Programa de consola en **C#** para llevar el registro de ventas de mi emprendimiento de mates ([Mateverso](https://mateverso.mitiendanube.com)). Nació como proyecto de la materia Programación y hoy lo uso en lugar de la planilla de Google Sheets.
 
 ## Qué hace
 
-- Muestra el catálogo de productos con su stock.
-- Crea pedidos con varios productos. Valida el id y el stock disponible, y descuenta el stock al agregar.
-- Guarda el cliente de cada pedido (nombre y usuario de Instagram o WhatsApp).
-- Cambia el estado del pedido: Pendiente, Pagado, Enviado, Entregado. Solo se puede avanzar, no volver atrás.
-- Calcula lo cobrado y lo pendiente de cobro.
-- Valida que lo que se escribe en el menú sea un número.
+- Registra ventas: productos, costo (con bolsa, sticker y tarjeta), precio de venta, medio de pago, fecha y estado.
+- Estados: **Pedido → Pagado → Entregado** (solo se avanza, no se retrocede).
+- Calcula la **ganancia** y el margen de cada venta.
+- Resumen por mes, por medio de pago, y totales: facturado, costos, ganancia, cobrado, por cobrar y por entregar.
+- **Guarda todo en un archivo** (`Documentos\Mateverso\ventas.csv`), así los datos siguen cuando se cierra el programa.
+- **Importa la planilla vieja** exportada como CSV, e informa las filas que hay que revisar a mano.
+- Exporta una copia en CSV que abre Excel o Google Sheets.
 
-## Conceptos de programación orientada a objetos que practiqué
+## Conceptos de la materia que se usan
 
-- Clases con **encapsulamiento** (propiedades con `private set`)
-- **Composición**: un `Pedido` tiene un `Cliente` y una lista de `LineaPedido`
-- Colecciones con `List<T>` y recorridos con `foreach`
-- `enum` para los estados del pedido
-- Propiedades calculadas (`Total`, `Subtotal`)
-- Sobrescritura de `ToString()`
-- Separación de responsabilidades: cada clase tiene una sola tarea
+Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T>`, `Dictionary`, composición, métodos estáticos, manejo de excepciones y lectura/escritura de archivos.
 
 ## Estructura
 
-```
-sistema-pedidos-mateverso/
-├── Program.cs        Menú y entrada por consola
-├── Tienda.cs         Maneja los productos y los pedidos
-├── Pedido.cs         Pedido: cliente, líneas, total y estado
-├── LineaPedido.cs    Un producto y su cantidad dentro de un pedido
-├── Producto.cs       Producto con precio y stock
-├── Cliente.cs        Nombre y contacto del cliente
-└── EstadoPedido.cs   Estados posibles del pedido
-```
+| Archivo | Rol |
+|---|---|
+| `Venta.cs` | Modelo de una venta y sus cálculos |
+| `RegistroVentas.cs` | Lista de ventas y reportes |
+| `ArchivoVentas.cs` | Guardar y cargar el archivo propio del programa |
+| `ImportadorPlanilla.cs` | Lectura tolerante de la planilla exportada |
+| `LectorCsv.cs` | Lector/escritor de CSV (respeta comillas) |
+| `Formato.cs` | Montos en pesos (`$1.234`) |
+| `EstadoVenta.cs`, `MedioPago.cs` | Enumeraciones |
+| `Program.cs` | Menú de consola |
 
-## Cómo ejecutarlo
+## Cómo probarlo
 
-1. Clonar el repo y abrir la solución en **Visual Studio** (.NET).
-2. Presionar **F5**.
+1. Abrí `SistemaPedidos.slnx` en Visual Studio y ejecutá (F5).
+2. Opción **6** e ingresá la ruta de `ejemplo-planilla.csv` para ver cómo importa.
+
+## Privacidad
+
+Los datos reales (ventas, costos) **no están en este repositorio**: se guardan localmente fuera del proyecto y el `.gitignore` los excluye. `ejemplo-planilla.csv` tiene datos inventados.
 
 ## Estado del proyecto
 
-Prototipo funcional. Próximos pasos:
-- Guardar productos y pedidos en un archivo JSON para que no se pierdan al cerrar el programa
-- Buscar pedidos por cliente
-- Agregar un reporte de productos más vendidos
-
-## Autor
-
-Janez · Estudiante de la Tecnicatura Universitaria en Programación (UTN Haedo)
+- [x] v1: pedidos en memoria
+- [x] v2: ventas reales, archivo, importación y reportes
+- [ ] Próximo: catálogo de productos con costos, productos más vendidos
