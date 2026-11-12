@@ -1,4 +1,5 @@
 # Sistema de ventas Mateverso
+![Resumen de ventas con datos de ejemplo](captura-ventas.png)
 
 Programa de consola en **C#** para llevar el registro de ventas de mi emprendimiento de mates ([Mateverso](https://mateverso.mitiendanube.com)). Nació como proyecto de la materia Programación y hoy lo uso en lugar de la planilla de Google Sheets.
 
