@@ -1,6 +1,6 @@
 ﻿//////// Venta.cs ////////
 using System;
-
+ 
 namespace SistemaPedidos
 {
     // Una venta: equivale a una fila de la planilla.
@@ -13,7 +13,7 @@ namespace SistemaPedidos
         public decimal PrecioVenta { get; private set; }    // lo que se cobró en total
         public MedioPago Medio { get; private set; }
         public EstadoVenta Estado { get; private set; }
-
+ 
         // Datos opcionales
         public DateTime? FechaSegundoPago { get; set; }     // cuando se paga parte y parte
         public decimal Bolsa { get; set; }
@@ -21,7 +21,7 @@ namespace SistemaPedidos
         public decimal Tarjeta { get; set; }
         public bool EsRegalo { get; set; }
         public string Nota { get; set; }
-
+ 
         public Venta(int numero, DateTime fecha, string productos, decimal costoTotal,
                      decimal precioVenta, MedioPago medio, EstadoVenta estado)
         {
@@ -34,13 +34,13 @@ namespace SistemaPedidos
             Estado = estado;
             Nota = "";
         }
-
+ 
         // Propiedades calculadas
         public decimal Ganancia
         {
             get { return PrecioVenta - CostoTotal; }
         }
-
+ 
         public decimal MargenPorcentaje
         {
             get
@@ -52,7 +52,7 @@ namespace SistemaPedidos
                 return Ganancia / PrecioVenta * 100;
             }
         }
-
+ 
         // Solo se puede avanzar de estado: Pedido -> Pagado -> Entregado
         public bool CambiarEstado(EstadoVenta nuevoEstado)
         {
@@ -63,7 +63,20 @@ namespace SistemaPedidos
             Estado = nuevoEstado;
             return true;
         }
-
+ 
+        // Corrige los datos principales de la venta (por ejemplo, si se cargó mal un monto).
+        // A diferencia de CambiarEstado, acá el estado también puede volver atrás.
+        public void Corregir(DateTime fecha, string productos, decimal costoTotal,
+                             decimal precioVenta, MedioPago medio, EstadoVenta estado)
+        {
+            Fecha = fecha;
+            Productos = productos;
+            CostoTotal = costoTotal;
+            PrecioVenta = precioVenta;
+            Medio = medio;
+            Estado = estado;
+        }
+ 
         // Una línea resumida para listar
         public string ALinea()
         {
@@ -75,7 +88,7 @@ namespace SistemaPedidos
             return string.Format("#{0,-3} {1:dd/MM/yyyy} {2,-9} {3,9} gan. {4,9}  {5}",
                 Numero, Fecha, Estado, Formato.Pesos(PrecioVenta), Formato.Pesos(Ganancia), productos);
         }
-
+ 
         public void Mostrar()
         {
             Console.WriteLine("Venta #" + Numero + (EsRegalo ? "  (REGALO)" : ""));

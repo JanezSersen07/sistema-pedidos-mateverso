@@ -1,29 +1,29 @@
 ﻿//////// RegistroVentas.cs ////////
 using System;
 using System.Collections.Generic;
-
+ 
 namespace SistemaPedidos
 {
     // Guarda la lista de ventas y calcula los reportes.
     public class RegistroVentas
     {
         private List<Venta> ventas = new List<Venta>();
-
+ 
         public RegistroVentas(List<Venta> ventasIniciales)
         {
             ventas = ventasIniciales;
         }
-
+ 
         public List<Venta> Ventas
         {
             get { return ventas; }
         }
-
+ 
         public int Cantidad
         {
             get { return ventas.Count; }
         }
-
+ 
         public int ProximoNumero()
         {
             int mayor = 0;
@@ -36,12 +36,12 @@ namespace SistemaPedidos
             }
             return mayor + 1;
         }
-
+ 
         public void Agregar(Venta venta)
         {
             ventas.Add(venta);
         }
-
+ 
         public Venta Buscar(int numero)
         {
             foreach (Venta v in ventas)
@@ -53,7 +53,32 @@ namespace SistemaPedidos
             }
             return null;
         }
-
+ 
+        public bool Eliminar(int numero)
+        {
+            Venta venta = Buscar(numero);
+            if (venta == null)
+            {
+                return false;
+            }
+            ventas.Remove(venta);
+            return true;
+        }
+ 
+        // Devuelve las ventas que cumplen todos los criterios del filtro
+        public List<Venta> Filtrar(FiltroVentas filtro)
+        {
+            List<Venta> resultado = new List<Venta>();
+            foreach (Venta v in ventas)
+            {
+                if (filtro.Coincide(v))
+                {
+                    resultado.Add(v);
+                }
+            }
+            return resultado;
+        }
+ 
         // Lo que ya está pagado (Pagado + Entregado)
         public decimal TotalCobrado()
         {
@@ -67,7 +92,7 @@ namespace SistemaPedidos
             }
             return total;
         }
-
+ 
         // Lo que falta cobrar (Pedido)
         public decimal TotalPorCobrar()
         {
@@ -81,7 +106,7 @@ namespace SistemaPedidos
             }
             return total;
         }
-
+ 
         public decimal TotalCostos()
         {
             decimal total = 0;
@@ -91,7 +116,7 @@ namespace SistemaPedidos
             }
             return total;
         }
-
+ 
         public decimal TotalVentas()
         {
             decimal total = 0;
@@ -101,12 +126,12 @@ namespace SistemaPedidos
             }
             return total;
         }
-
+ 
         public decimal GananciaTotal()
         {
             return TotalVentas() - TotalCostos();
         }
-
+ 
         public int CantidadConEstado(EstadoVenta estado)
         {
             int cantidad = 0;
@@ -119,12 +144,12 @@ namespace SistemaPedidos
             }
             return cantidad;
         }
-
+ 
         // Muestra ventas, costos y ganancia agrupados por mes
         public void MostrarResumenPorMes()
         {
             SortedDictionary<string, decimal[]> meses = new SortedDictionary<string, decimal[]>();
-
+ 
             foreach (Venta v in ventas)
             {
                 string clave = v.Fecha.ToString("yyyy-MM");
@@ -136,7 +161,7 @@ namespace SistemaPedidos
                 meses[clave][1] += v.PrecioVenta;
                 meses[clave][2] += v.CostoTotal;
             }
-
+ 
             Console.WriteLine("Mes      Ventas   Facturado     Costos    Ganancia");
             foreach (KeyValuePair<string, decimal[]> par in meses)
             {
@@ -145,7 +170,7 @@ namespace SistemaPedidos
                     par.Key, d[0], Formato.Pesos(d[1]), Formato.Pesos(d[2]), Formato.Pesos(d[1] - d[2]));
             }
         }
-
+ 
         // Muestra cuánto se vendió con cada medio de pago
         public void MostrarResumenPorMedio()
         {
