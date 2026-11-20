@@ -13,6 +13,8 @@ Programa de consola en **C#** para llevar el registro de ventas de mi emprendimi
 - **Busca y filtra** ventas por texto, rango de fechas, estado y medio de pago, y suma lo facturado y la ganancia de lo encontrado.
 - **Corrige** una venta cargada con errores (con confirmación antes de guardar) y **elimina** ventas pidiendo escribir una palabra de seguridad.
 - Exporta una copia en CSV que abre Excel o Google Sheets.
+- **Catálogo de productos** con costo y precio: se agregan, editan y eliminan desde el menú. Al cargar una venta se eligen del catálogo (por número o por parte del nombre) y el programa completa el detalle, el costo y un precio sugerido.
+- **Productos más vendidos**: unidades, facturado y ganancia por producto, ordenados por unidades o por ganancia.
 
 ## Conceptos de la materia que se usan
 
@@ -23,6 +25,10 @@ Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T
 | Archivo | Rol |
 |---|---|
 | `Venta.cs` | Modelo de una venta y sus cálculos |
+| `ItemVenta.cs` | Un producto dentro de una venta, con cantidad y los valores del día |
+| `Producto.cs` | Un producto del catálogo (nombre, costo, precio) |
+| `CatalogoProductos.cs` | Lista de productos: agregar, buscar y eliminar |
+| `ArchivoProductos.cs` | Guardar y cargar el catálogo (`productos.csv`) |
 | `RegistroVentas.cs` | Lista de ventas, búsqueda, borrado y reportes |
 | `FiltroVentas.cs` | Criterios de búsqueda (texto, fechas, estado, medio de pago) |
 | `ArchivoVentas.cs` | Guardar y cargar el archivo propio del programa |
@@ -37,6 +43,14 @@ Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T
 1. Abrí `SistemaPedidos.slnx` en Visual Studio y ejecutá (F5).
 2. Opción **6** e ingresá la ruta de `ejemplo-planilla.csv` para ver cómo importa.
 
+## Catálogo y productos más vendidos
+
+- Opción **11**: ver, agregar, editar y eliminar productos. Se guardan en `Documentos\Mateverso\productos.csv`.
+- Opción **2** (nueva venta): si hay productos en el catálogo, pregunta si querés cargarlos desde ahí. Se escribe el número o parte del nombre, y la cantidad. Si un producto no está, se puede cargar a mano solo para esa venta. El precio de venta se sugiere con la suma de precios y se puede cambiar (descuentos, combos).
+- Cada venta guarda el **nombre, el costo y el precio del día** de cada producto. Si después cambia el catálogo o se borra un producto, las ventas anteriores no se modifican.
+- Opción **12**: productos más vendidos. Solo cuenta las ventas cargadas desde el catálogo; las importadas de la planilla o escritas a mano no tienen detalle de productos.
+- Los archivos de ventas anteriores siguen funcionando: el detalle de productos es una columna nueva y opcional.
+
 ## Privacidad
 
 Los datos reales (ventas, costos) **no están en este repositorio**: se guardan localmente fuera del proyecto y el `.gitignore` los excluye. `ejemplo-planilla.csv` tiene datos inventados.
@@ -46,4 +60,5 @@ Los datos reales (ventas, costos) **no están en este repositorio**: se guardan 
 - [x] v1: pedidos en memoria
 - [x] v2: ventas reales, archivo, importación y reportes
 - [x] v3: búsqueda y filtros, corrección y borrado de ventas
-- [ ] Próximo: catálogo de productos con costos, productos más vendidos
+- [x] v4: catálogo de productos con costos y reporte de productos más vendidos
+- [ ] Próximo: backup automático con fecha y opción de restaurar

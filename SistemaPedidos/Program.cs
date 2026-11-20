@@ -10,7 +10,9 @@ namespace SistemaPedidos
     class Program
     {
         static RegistroVentas registro;
+        static CatalogoProductos catalogo;
         static string rutaDatos;
+        static string rutaProductos;
  
         static void Main(string[] args)
         {
@@ -20,6 +22,7 @@ namespace SistemaPedidos
             // así nunca se suben a GitHub por accidente.
             string documentos = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             rutaDatos = Path.Combine(documentos, "Mateverso", "ventas.csv");
+            rutaProductos = Path.Combine(documentos, "Mateverso", "productos.csv");
  
             try
             {
@@ -32,8 +35,20 @@ namespace SistemaPedidos
                 return;
             }
  
+            try
+            {
+                catalogo = new CatalogoProductos(ArchivoProductos.Cargar(rutaProductos));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("No pude leer el archivo de productos: " + ex.Message);
+                Console.WriteLine("Revisalo (" + rutaProductos + ") antes de seguir, para no pisar tus datos.");
+                return;
+            }
+
             Console.WriteLine("Datos: " + rutaDatos);
             Console.WriteLine("Ventas cargadas: " + registro.Cantidad);
+            Console.WriteLine("Productos en el catálogo: " + catalogo.Cantidad);
             Console.WriteLine();
  
             int opcion = -1;
@@ -55,6 +70,8 @@ namespace SistemaPedidos
                     case 8: BuscarVentas(); break;
                     case 9: CorregirVenta(); break;
                     case 10: EliminarVenta(); break;
+                    case 11: MenuCatalogo(); break;
+                    case 12: ProductosMasVendidos(); break;
                     case 0: Console.WriteLine("¡Hasta luego!"); break;
                     default: Console.WriteLine("Opción inválida."); break;
                 }
@@ -75,6 +92,8 @@ namespace SistemaPedidos
             Console.WriteLine("8. Buscar y filtrar ventas");
             Console.WriteLine("9. Corregir una venta");
             Console.WriteLine("10. Eliminar una venta");
+            Console.WriteLine("11. Catálogo de productos");
+            Console.WriteLine("12. Productos más vendidos");
             Console.WriteLine("0. Salir");
         }
  
@@ -268,20 +287,56 @@ namespace SistemaPedidos
  
         static void NuevaVenta()
         {
-            Console.Write("Productos (texto libre): ");
-            string productos = Console.ReadLine();
-            if (string.IsNullOrWhiteSpace(productos))
+            string productos;
+            decimal costoProductos = 0;
+            decimal precioSugerido = 0;
+            List<ItemVenta> items = new List<ItemVenta>();
+
+            if (UsarCatalogo())
             {
-                Console.WriteLine("Se canceló: falta el detalle de productos.");
-                return;
+                items = ElegirProductosDeVenta();
+                if (items.Count == 0)
+                {
+                    Console.WriteLine("Se canceló: no agregaste ningún producto.");
+                    return;
+                }
+                productos = TextoDeProductos(items);
+                foreach (ItemVenta item in items)
+                {
+                    costoProductos += item.CostoTotal;
+                    precioSugerido += item.PrecioTotal;
+                }
+                Console.WriteLine();
+                Console.WriteLine("Productos: " + productos);
+                Console.WriteLine("Costo de los productos: " + Formato.Pesos(costoProductos));
             }
- 
-            decimal costoProductos = LeerMonto("Costo de los productos: ", false);
+            else
+            {
+                Console.Write("Productos (texto libre): ");
+                productos = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(productos))
+                {
+                    Console.WriteLine("Se canceló: falta el detalle de productos.");
+                    return;
+                }
+                costoProductos = LeerMonto("Costo de los productos: ", false);
+            }
+
             decimal bolsa = LeerMonto("Costo de la bolsa (Enter si no hay): ", true);
             decimal sticker = LeerMonto("Costo del sticker (Enter si no hay): ", true);
             decimal tarjeta = LeerMonto("Costo de la tarjeta de curado (Enter si no hay): ", true);
-            decimal precioVenta = LeerMonto("Precio de venta: ", false);
- 
+
+            decimal precioVenta;
+            if (items.Count > 0)
+            {
+                // Con el catálogo se sugiere la suma de precios; se puede cambiar (descuentos, combos)
+                precioVenta = LeerMontoConActual("Precio de venta (Enter = el sugerido)", precioSugerido);
+            }
+            else
+            {
+                precioVenta = LeerMonto("Precio de venta: ", false);
+            }
+
             Console.WriteLine("Medio de pago: 1. Mercado Pago  2. Efectivo  3. Transferencia  4. Tarjeta web");
             int medio = LeerEntero("Medio (0 = Mercado Pago): ");
             if (medio < 1 || medio > 4)
@@ -304,6 +359,10 @@ namespace SistemaPedidos
             venta.Bolsa = bolsa;
             venta.Sticker = sticker;
             venta.Tarjeta = tarjeta;
+            foreach (ItemVenta item in items)
+            {
+                venta.Items.Add(item);
+            }
  
             registro.Agregar(venta);
             Guardar();
@@ -516,6 +575,10 @@ namespace SistemaPedidos
             venta.Mostrar();
             Console.WriteLine();
             Console.WriteLine("Enter deja cada dato como está.");
+            if (venta.Items.Count > 0)
+            {
+                Console.WriteLine("(El detalle de productos del catálogo no cambia al corregir; solo los datos de abajo.)");
+            }
  
             DateTime fecha = LeerFechaConActual("Fecha", venta.Fecha);
             string productos = LeerTextoConActual("Productos", venta.Productos);
@@ -586,6 +649,249 @@ namespace SistemaPedidos
             Console.WriteLine("La versión anterior queda en ventas.csv.bak hasta el próximo cambio.");
         }
  
+        // ---------- Catálogo de productos ----------
+
+        static bool UsarCatalogo()
+        {
+            if (catalogo.Cantidad == 0)
+            {
+                Console.WriteLine("(Tip: cargá tus productos en la opción 11 y el costo y el precio se completan solos.)");
+                return false;
+            }
+            Console.Write("¿Cargar los productos desde el catálogo? (s/n, Enter = s): ");
+            string respuesta = Console.ReadLine();
+            return respuesta == null || respuesta.Trim() == "" || respuesta.Trim().ToLower() == "s";
+        }
+
+        static string TextoDeProductos(List<ItemVenta> items)
+        {
+            List<string> partes = new List<string>();
+            foreach (ItemVenta item in items)
+            {
+                partes.Add(item.ATexto());
+            }
+            return string.Join(" + ", partes);
+        }
+
+        // Pide productos uno por uno (por número o por parte del nombre) hasta un Enter vacío
+        static List<ItemVenta> ElegirProductosDeVenta()
+        {
+            List<ItemVenta> items = new List<ItemVenta>();
+            Console.WriteLine("Escribí el número o parte del nombre del producto. Enter vacío = terminar.");
+
+            while (true)
+            {
+                Console.Write("Producto: ");
+                string texto = Console.ReadLine();
+                if (texto == null || texto.Trim() == "")
+                {
+                    break;
+                }
+                texto = texto.Trim();
+
+                Producto elegido = null;
+                int id;
+                if (int.TryParse(texto, out id))
+                {
+                    elegido = catalogo.Buscar(id);
+                }
+                if (elegido == null)
+                {
+                    List<Producto> coincidencias = catalogo.BuscarPorTexto(texto);
+                    if (coincidencias.Count == 1)
+                    {
+                        elegido = coincidencias[0];
+                    }
+                    else if (coincidencias.Count > 1)
+                    {
+                        Console.WriteLine("Hay " + coincidencias.Count + " productos así. Escribí el número del que querés:");
+                        for (int i = 0; i < coincidencias.Count && i < 15; i++)
+                        {
+                            Console.WriteLine("  " + coincidencias[i].ALinea());
+                        }
+                        continue;
+                    }
+                }
+
+                if (elegido != null)
+                {
+                    int cantidad = LeerEnteroConActual("Cantidad (Enter = 1): ", 1, 1, 99);
+                    items.Add(new ItemVenta(elegido.Nombre, cantidad, elegido.Costo, elegido.Precio));
+                }
+                else
+                {
+                    Console.Write("No está en el catálogo. ¿Cargarlo a mano en esta venta? (s/n): ");
+                    string respuesta = Console.ReadLine();
+                    if (respuesta == null || respuesta.Trim().ToLower() != "s")
+                    {
+                        continue;
+                    }
+                    string nombre = LeerTextoConActual("Nombre", texto);
+                    decimal costo = LeerMonto("Costo (por unidad): ", false);
+                    decimal precio = LeerMonto("Precio (por unidad): ", false);
+                    int cantidad = LeerEnteroConActual("Cantidad (Enter = 1): ", 1, 1, 99);
+                    items.Add(new ItemVenta(nombre, cantidad, costo, precio));
+                }
+
+                ItemVenta ultimo = items[items.Count - 1];
+                Console.WriteLine("  + " + ultimo.ATexto() + "  (costo " + Formato.Pesos(ultimo.CostoTotal)
+                    + ", precio " + Formato.Pesos(ultimo.PrecioTotal) + ")");
+            }
+            return items;
+        }
+
+        static void MenuCatalogo()
+        {
+            int opcion = -1;
+            while (opcion != 0)
+            {
+                Console.WriteLine("--- CATÁLOGO DE PRODUCTOS (" + catalogo.Cantidad + ") ---");
+                Console.WriteLine("1. Ver productos");
+                Console.WriteLine("2. Agregar un producto");
+                Console.WriteLine("3. Editar un producto");
+                Console.WriteLine("4. Eliminar un producto");
+                Console.WriteLine("0. Volver");
+                opcion = LeerEntero("Opción: ");
+                Console.WriteLine();
+
+                switch (opcion)
+                {
+                    case 1: VerCatalogo(); break;
+                    case 2: AgregarProducto(); break;
+                    case 3: EditarProducto(); break;
+                    case 4: EliminarProducto(); break;
+                    case 0: break;
+                    default: Console.WriteLine("Opción inválida."); break;
+                }
+                Console.WriteLine();
+            }
+        }
+
+        static void VerCatalogo()
+        {
+            if (catalogo.Cantidad == 0)
+            {
+                Console.WriteLine("Todavía no hay productos en el catálogo.");
+                return;
+            }
+            foreach (Producto p in catalogo.Productos)
+            {
+                Console.WriteLine(p.ALinea());
+            }
+        }
+
+        static void AgregarProducto()
+        {
+            Console.Write("Nombre del producto: ");
+            string nombre = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(nombre))
+            {
+                Console.WriteLine("Se canceló: falta el nombre.");
+                return;
+            }
+            nombre = nombre.Trim();
+            if (catalogo.ExisteNombre(nombre))
+            {
+                Console.WriteLine("Ya hay un producto con ese nombre.");
+                return;
+            }
+
+            decimal costo = LeerMonto("Costo: ", false);
+            decimal precio = LeerMonto("Precio de venta: ", false);
+
+            Producto producto = catalogo.Agregar(nombre, costo, precio);
+            GuardarCatalogo();
+            Console.WriteLine("Producto agregado:");
+            Console.WriteLine(producto.ALinea());
+        }
+
+        static void EditarProducto()
+        {
+            int id = LeerEntero("Número de producto a editar: ");
+            Producto producto = catalogo.Buscar(id);
+            if (producto == null)
+            {
+                Console.WriteLine("No existe ese producto.");
+                return;
+            }
+
+            Console.WriteLine(producto.ALinea());
+            Console.WriteLine("Enter deja cada dato como está. Las ventas anteriores no cambian.");
+            string nombre = LeerTextoConActual("Nombre", producto.Nombre);
+            decimal costo = LeerMontoConActual("Costo", producto.Costo);
+            decimal precio = LeerMontoConActual("Precio de venta", producto.Precio);
+
+            Console.Write("¿Guardar los cambios? (s/n): ");
+            string respuesta = Console.ReadLine();
+            if (respuesta == null || respuesta.Trim().ToLower() != "s")
+            {
+                Console.WriteLine("No se guardó ningún cambio.");
+                return;
+            }
+
+            producto.Corregir(nombre, costo, precio);
+            GuardarCatalogo();
+            Console.WriteLine("Producto actualizado:");
+            Console.WriteLine(producto.ALinea());
+        }
+
+        static void EliminarProducto()
+        {
+            int id = LeerEntero("Número de producto a eliminar: ");
+            Producto producto = catalogo.Buscar(id);
+            if (producto == null)
+            {
+                Console.WriteLine("No existe ese producto.");
+                return;
+            }
+
+            Console.WriteLine(producto.ALinea());
+            Console.Write("¿Eliminarlo del catálogo? Las ventas ya cargadas no cambian. (s/n): ");
+            string respuesta = Console.ReadLine();
+            if (respuesta == null || respuesta.Trim().ToLower() != "s")
+            {
+                Console.WriteLine("No se eliminó nada.");
+                return;
+            }
+
+            catalogo.Eliminar(id);
+            GuardarCatalogo();
+            Console.WriteLine("Producto eliminado.");
+        }
+
+        static void ProductosMasVendidos()
+        {
+            int conDetalle = registro.CantidadConDetalle();
+            if (conDetalle == 0)
+            {
+                Console.WriteLine("Todavía no hay ventas con productos del catálogo.");
+                Console.WriteLine("Se cuentan las ventas nuevas cargadas con la opción 2 desde el catálogo.");
+                return;
+            }
+
+            Console.WriteLine("Ordenar por: 1. Unidades vendidas  2. Ganancia");
+            int orden = LeerEnteroConActual("Orden (Enter = 1): ", 1, 1, 2);
+            Console.WriteLine();
+            registro.MostrarProductosMasVendidos(orden, 15);
+            Console.WriteLine();
+            Console.WriteLine("Se cuentan " + conDetalle + " de " + registro.Cantidad
+                + " ventas (las demás no tienen detalle de productos).");
+            Console.WriteLine("La ganancia es de los productos, sin descontar bolsa, sticker ni tarjeta.");
+        }
+
+        static void GuardarCatalogo()
+        {
+            try
+            {
+                ArchivoProductos.Guardar(catalogo.Productos, rutaProductos);
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine("¡Ojo! No se pudo guardar el catálogo: " + ex.Message);
+                Console.WriteLine("Si tenés el archivo abierto en Excel, cerralo.");
+            }
+        }
+
         static void Guardar()
         {
             try

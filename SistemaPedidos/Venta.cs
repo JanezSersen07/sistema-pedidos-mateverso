@@ -1,5 +1,6 @@
 ﻿//////// Venta.cs ////////
 using System;
+using System.Collections.Generic;
  
 namespace SistemaPedidos
 {
@@ -22,6 +23,9 @@ namespace SistemaPedidos
         public bool EsRegalo { get; set; }
         public string Nota { get; set; }
  
+        // Detalle de productos cargados desde el catálogo (puede estar vacío en ventas viejas)
+        public List<ItemVenta> Items { get; private set; }
+ 
         public Venta(int numero, DateTime fecha, string productos, decimal costoTotal,
                      decimal precioVenta, MedioPago medio, EstadoVenta estado)
         {
@@ -33,6 +37,7 @@ namespace SistemaPedidos
             Medio = medio;
             Estado = estado;
             Nota = "";
+            Items = new List<ItemVenta>();
         }
  
         // Propiedades calculadas
@@ -95,6 +100,11 @@ namespace SistemaPedidos
             Console.WriteLine("  Fecha:    " + Fecha.ToString("dd/MM/yyyy")
                 + (FechaSegundoPago.HasValue ? "  y  " + FechaSegundoPago.Value.ToString("dd/MM/yyyy") : ""));
             Console.WriteLine("  Productos: " + Productos);
+            foreach (ItemVenta item in Items)
+            {
+                Console.WriteLine("     - " + item.ATexto() + "  (costo " + Formato.Pesos(item.CostoTotal)
+                    + ", precio " + Formato.Pesos(item.PrecioTotal) + ")");
+            }
             Console.WriteLine("  Costo total: " + Formato.Pesos(CostoTotal)
                 + "   (bolsa " + Formato.Pesos(Bolsa) + ", sticker " + Formato.Pesos(Sticker)
                 + ", tarjeta " + Formato.Pesos(Tarjeta) + ")");

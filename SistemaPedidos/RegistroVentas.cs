@@ -171,6 +171,67 @@ namespace SistemaPedidos
             }
         }
  
+        // Cuenta las ventas que tienen el detalle de productos del catálogo
+        public int CantidadConDetalle()
+        {
+            int cantidad = 0;
+            foreach (Venta v in ventas)
+            {
+                if (v.Items.Count > 0)
+                {
+                    cantidad++;
+                }
+            }
+            return cantidad;
+        }
+
+        // Productos más vendidos: suma unidades, facturado y ganancia de cada producto.
+        // Solo cuentan las ventas que tienen detalle. Orden: 1 = unidades, 2 = ganancia.
+        public void MostrarProductosMasVendidos(int orden, int maximo)
+        {
+            Dictionary<string, decimal[]> totales = new Dictionary<string, decimal[]>();
+            foreach (Venta v in ventas)
+            {
+                foreach (ItemVenta item in v.Items)
+                {
+                    if (!totales.ContainsKey(item.Nombre))
+                    {
+                        totales[item.Nombre] = new decimal[] { 0, 0, 0 }; // unidades, facturado, ganancia
+                    }
+                    totales[item.Nombre][0] += item.Cantidad;
+                    totales[item.Nombre][1] += item.PrecioTotal;
+                    totales[item.Nombre][2] += item.Ganancia;
+                }
+            }
+
+            List<KeyValuePair<string, decimal[]>> lista = new List<KeyValuePair<string, decimal[]>>(totales);
+            int columna = orden == 2 ? 2 : 0;
+            // Ordena de mayor a menor; si empatan, queda primero el de más facturado
+            lista.Sort((a, b) =>
+            {
+                int comparacion = b.Value[columna].CompareTo(a.Value[columna]);
+                return comparacion != 0 ? comparacion : b.Value[1].CompareTo(a.Value[1]);
+            });
+
+            Console.WriteLine("Producto                                  Unid.   Facturado    Ganancia");
+            int mostrados = 0;
+            foreach (KeyValuePair<string, decimal[]> par in lista)
+            {
+                if (mostrados >= maximo)
+                {
+                    break;
+                }
+                string nombre = par.Key.Length > 40 ? par.Key.Substring(0, 37) + "..." : par.Key;
+                Console.WriteLine("{0,-40} {1,6}  {2,10}  {3,10}",
+                    nombre, par.Value[0], Formato.Pesos(par.Value[1]), Formato.Pesos(par.Value[2]));
+                mostrados++;
+            }
+            if (lista.Count > maximo)
+            {
+                Console.WriteLine("(Se muestran los primeros " + maximo + " de " + lista.Count + ")");
+            }
+        }
+
         // Muestra cuánto se vendió con cada medio de pago
         public void MostrarResumenPorMedio()
         {

@@ -432,3 +432,6 @@ ventas*.csv
 copia-ventas*.csv
 *.bak
  
+
+# Catálogo de productos con costos: nunca se sube
+productos*.csv

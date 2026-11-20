@@ -15,7 +15,7 @@ namespace SistemaPedidos
         private const string FORMATO_FECHA = "yyyy-MM-dd";
 
         private const string ENCABEZADO =
-            "Numero;Fecha;FechaSegundoPago;Productos;CostoTotal;Bolsa;Sticker;Tarjeta;PrecioVenta;MedioPago;Estado;EsRegalo;Nota";
+            "Numero;Fecha;FechaSegundoPago;Productos;CostoTotal;Bolsa;Sticker;Tarjeta;PrecioVenta;MedioPago;Estado;EsRegalo;Nota;Items";
 
         public static void Guardar(List<Venta> ventas, string ruta)
         {
@@ -43,7 +43,8 @@ namespace SistemaPedidos
                     v.Medio.ToString(),
                     v.Estado.ToString(),
                     v.EsRegalo ? "Si" : "No",
-                    v.Nota
+                    v.Nota,
+                    ItemsATexto(v)
                 };
                 for (int i = 0; i < campos.Length; i++)
                 {
@@ -94,6 +95,14 @@ namespace SistemaPedidos
                     v.Tarjeta = Leer(f[7]);
                     v.EsRegalo = f[11] == "Si";
                     v.Nota = f[12];
+                    // La columna 14 (detalle de productos) puede no existir en archivos viejos
+                    if (f.Count >= 14 && f[13] != "")
+                    {
+                        foreach (string texto in f[13].Split('|'))
+                        {
+                            v.Items.Add(ItemVenta.Leer(texto));
+                        }
+                    }
                     ventas.Add(v);
                 }
                 catch (FormatException)
@@ -106,6 +115,16 @@ namespace SistemaPedidos
                 }
             }
             return ventas;
+        }
+
+        private static string ItemsATexto(Venta v)
+        {
+            List<string> partes = new List<string>();
+            foreach (ItemVenta item in v.Items)
+            {
+                partes.Add(item.Serializar());
+            }
+            return string.Join("|", partes);
         }
 
         private static string Numero(decimal valor)
