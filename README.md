@@ -1,6 +1,10 @@
 # Sistema de ventas Mateverso
 
-Programa de consola en **C#** para llevar el registro de ventas de mi emprendimiento de mates ([Mateverso](https://mateverso.mitiendanube.com)). Nació como proyecto de la materia Programación y hoy lo uso en lugar de la planilla de Google Sheets.
+Programa de consola en **C#** para llevar el registro de ventas de mi emprendimiento de mates ([Mateverso](https://janezsersen07.github.io/catalogo-mateverso/)). Nació como proyecto de la materia Programación y hoy lo uso en lugar de la planilla de Google Sheets.
+
+![Menú y resumen de ganancias](captura-ventas.png)
+
+*Las capturas usan datos de ejemplo.*
 
 ## Qué hace
 
@@ -44,6 +48,10 @@ Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T
 2. Opción **6** e ingresá la ruta de `ejemplo-planilla.csv` para ver cómo importa.
 
 ## Catálogo y productos más vendidos
+
+![Catálogo de productos](captura-ventas-catalogo.png)
+
+![Productos más vendidos](captura-ventas-mas-vendidos.png)
 
 - Opción **11**: ver, agregar, editar y eliminar productos. Se guardan en `Documentos\Mateverso\productos.csv`.
 - Opción **2** (nueva venta): si hay productos en el catálogo, pregunta si querés cargarlos desde ahí. Se escribe el número o parte del nombre, y la cantidad. Si un producto no está, se puede cargar a mano solo para esa venta. El precio de venta se sugiere con la suma de precios y se puede cambiar (descuentos, combos).
