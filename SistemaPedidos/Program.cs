@@ -72,6 +72,7 @@ namespace SistemaPedidos
                     case 10: EliminarVenta(); break;
                     case 11: MenuCatalogo(); break;
                     case 12: ProductosMasVendidos(); break;
+                    case 13: MenuCopias(); break;
                     case 0: Console.WriteLine("¡Hasta luego!"); break;
                     default: Console.WriteLine("Opción inválida."); break;
                 }
@@ -94,6 +95,7 @@ namespace SistemaPedidos
             Console.WriteLine("10. Eliminar una venta");
             Console.WriteLine("11. Catálogo de productos");
             Console.WriteLine("12. Productos más vendidos");
+            Console.WriteLine("13. Copias de seguridad");
             Console.WriteLine("0. Salir");
         }
  
@@ -646,7 +648,7 @@ namespace SistemaPedidos
             registro.Eliminar(numero);
             Guardar();
             Console.WriteLine("Venta #" + numero + " eliminada.");
-            Console.WriteLine("La versión anterior queda en ventas.csv.bak hasta el próximo cambio.");
+            Console.WriteLine("La versión anterior queda en las copias de seguridad (opción 13).");
         }
  
         // ---------- Catálogo de productos ----------
@@ -879,10 +881,101 @@ namespace SistemaPedidos
             Console.WriteLine("La ganancia es de los productos, sin descontar bolsa, sticker ni tarjeta.");
         }
 
+        // ---------- Copias de seguridad ----------
+
+        static void MenuCopias()
+        {
+            Console.WriteLine("--- COPIAS DE SEGURIDAD ---");
+            Console.WriteLine("Se guarda una copia por día, automática, en Documentos\\Mateverso\\copias");
+            Console.WriteLine("(las últimas 30 de cada archivo).");
+            Console.WriteLine("1. Restaurar ventas");
+            Console.WriteLine("2. Restaurar catálogo de productos");
+            Console.WriteLine("0. Volver");
+            int opcion = LeerEntero("Opción: ");
+            Console.WriteLine();
+            if (opcion == 1)
+            {
+                Restaurar(rutaDatos, "ventas");
+            }
+            else if (opcion == 2)
+            {
+                Restaurar(rutaProductos, "catálogo");
+            }
+        }
+
+        static void Restaurar(string ruta, string que)
+        {
+            List<string> copias = CopiasSeguridad.Listar(ruta);
+            if (copias.Count == 0)
+            {
+                Console.WriteLine("Todavía no hay copias de " + que + ". Se crean solas al guardar.");
+                return;
+            }
+
+            int mostrar = Math.Min(copias.Count, 15);
+            for (int i = 0; i < mostrar; i++)
+            {
+                Console.WriteLine((i + 1) + ". " + Path.GetFileName(copias[i]));
+            }
+            int elegida = LeerEnteroConActual("Copia a restaurar (Enter = cancelar): ", 0, 0, mostrar);
+            if (elegida == 0)
+            {
+                Console.WriteLine("No se restauró nada.");
+                return;
+            }
+            string copia = copias[elegida - 1];
+
+            // Se comprueba que la copia se pueda leer antes de tocar nada
+            try
+            {
+                if (que == "ventas")
+                {
+                    ArchivoVentas.Cargar(copia);
+                }
+                else
+                {
+                    ArchivoProductos.Cargar(copia);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Esa copia no se puede leer (" + ex.Message + "). No se cambió nada.");
+                return;
+            }
+
+            Console.Write("Esto reemplaza lo que hay ahora (" + que + "); lo actual se resguarda antes. Escribí RESTAURAR para seguir: ");
+            string respuesta = Console.ReadLine();
+            if (respuesta == null || respuesta.Trim().ToUpperInvariant() != "RESTAURAR")
+            {
+                Console.WriteLine("No se restauró nada.");
+                return;
+            }
+
+            try
+            {
+                CopiasSeguridad.Restaurar(copia, ruta);
+                if (que == "ventas")
+                {
+                    registro = new RegistroVentas(ArchivoVentas.Cargar(rutaDatos));
+                    Console.WriteLine("Listo: " + registro.Cantidad + " ventas restauradas.");
+                }
+                else
+                {
+                    catalogo = new CatalogoProductos(ArchivoProductos.Cargar(rutaProductos));
+                    Console.WriteLine("Listo: " + catalogo.Cantidad + " productos restaurados.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("No se pudo restaurar: " + ex.Message);
+            }
+        }
+
         static void GuardarCatalogo()
         {
             try
             {
+                CopiasSeguridad.CopiaDelDia(rutaProductos);
                 ArchivoProductos.Guardar(catalogo.Productos, rutaProductos);
             }
             catch (IOException ex)
@@ -896,6 +989,7 @@ namespace SistemaPedidos
         {
             try
             {
+                CopiasSeguridad.CopiaDelDia(rutaDatos);
                 ArchivoVentas.Guardar(registro.Ventas, rutaDatos);
             }
             catch (IOException ex)
