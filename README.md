@@ -38,6 +38,7 @@ Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T
 | `Formato.cs` | Montos en pesos (`$1.234`) |
 | `EstadoVenta.cs`, `MedioPago.cs` | Enumeraciones |
 | `Program.cs` | Menú de consola |
+| `../SistemaPedidos.Tests/` | Pruebas automáticas (xUnit) |
 
 ## Cómo probarlo
 
@@ -58,6 +59,15 @@ Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T
 - Opción **13**: restaurar ventas o catálogo desde una copia. Antes de reemplazar nada comprueba que la copia se pueda leer, pide escribir `RESTAURAR` y resguarda el estado actual (`...-antes-de-restaurar-...`), así que restaurar también se puede deshacer.
 - Si la copia falla por cualquier motivo, igual se guarda la venta; además sigue existiendo el `.bak` del guardado anterior.
 
+## Pruebas automáticas
+
+La carpeta `SistemaPedidos.Tests` tiene pruebas con xUnit que verifican el código sin usar el menú: cálculo de ganancias y márgenes, cambios de estado, filtros, catálogo, guardado y carga de archivos (incluidos los viejos sin detalle de productos) y copias de seguridad.
+
+- En Visual Studio: menú **Prueba > Ejecutar todas las pruebas**.
+- En consola: `dotnet test SistemaPedidos.Tests`.
+
+Las pruebas que escriben archivos usan una carpeta temporal y no tocan tus datos reales.
+
 ## Privacidad
 
 Los datos reales (ventas, costos) **no están en este repositorio**: se guardan localmente fuera del proyecto y el `.gitignore` los excluye. `ejemplo-planilla.csv` tiene datos inventados.
@@ -69,3 +79,4 @@ Los datos reales (ventas, costos) **no están en este repositorio**: se guardan 
 - [x] v3: búsqueda y filtros, corrección y borrado de ventas
 - [x] v4: catálogo de productos con costos y reporte de productos más vendidos
 - [x] v5: copias de seguridad automáticas con fecha y restauración desde el menú
+- [x] Pruebas automáticas con xUnit
