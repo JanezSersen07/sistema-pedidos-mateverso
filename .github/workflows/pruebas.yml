@@ -1,0 +1,22 @@
+name: Pruebas
+
+# Corre las pruebas automáticas (xUnit) cada vez que se sube código
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bajar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Correr las pruebas
+        run: dotnet test SistemaPedidos.Tests/SistemaPedidos.Tests.csproj --verbosity normal

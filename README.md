@@ -1,5 +1,7 @@
 # Sistema de ventas Mateverso
 
+[![Pruebas](https://github.com/JanezSersen07/sistema-pedidos-mateverso/actions/workflows/pruebas.yml/badge.svg)](https://github.com/JanezSersen07/sistema-pedidos-mateverso/actions/workflows/pruebas.yml)
+
 Programa de consola en **C#** para llevar el registro de ventas de mi emprendimiento de mates ([Mateverso](https://mateverso.mitiendanube.com)). Nació como proyecto de la materia Programación y hoy lo uso en lugar de la planilla de Google Sheets.
 
 ## Qué hace
