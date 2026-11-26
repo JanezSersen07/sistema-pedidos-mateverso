@@ -17,6 +17,7 @@ Programa de consola en **C#** para llevar el registro de ventas de mi emprendimi
 - Exporta una copia en CSV que abre Excel o Google Sheets.
 - **Catálogo de productos** con costo y precio: se agregan, editan y eliminan desde el menú. Al cargar una venta se eligen del catálogo (por número o por parte del nombre) y el programa completa el detalle, el costo y un precio sugerido.
 - **Productos más vendidos**: unidades, facturado y ganancia por producto, ordenados por unidades o por ganancia.
+- **Reportes**: ganancia por mes con margen y variación contra el mes anterior, rentabilidad por producto (por unidades, ganancia o margen), lista de pendientes de cobro y de entrega (con los días de espera) y exportación a Excel.
 
 ## Conceptos de la materia que se usan
 
@@ -33,6 +34,7 @@ Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T
 | `ArchivoProductos.cs` | Guardar y cargar el catálogo (`productos.csv`) |
 | `RegistroVentas.cs` | Lista de ventas, búsqueda, borrado y reportes |
 | `FiltroVentas.cs` | Criterios de búsqueda (texto, fechas, estado, medio de pago) |
+| `Reportes.cs` | Cálculo de los reportes (por mes, por producto, pendientes) y exportación a CSV |
 | `CopiasSeguridad.cs` | Copias con fecha, poda de las viejas y restauración |
 | `ArchivoVentas.cs` | Guardar y cargar el archivo propio del programa |
 | `ImportadorPlanilla.cs` | Lectura tolerante de la planilla exportada |
@@ -54,6 +56,17 @@ Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T
 - Cada venta guarda el **nombre, el costo y el precio del día** de cada producto. Si después cambia el catálogo o se borra un producto, las ventas anteriores no se modifican.
 - Opción **12**: productos más vendidos. Solo cuenta las ventas cargadas desde el catálogo; las importadas de la planilla o escritas a mano no tienen detalle de productos.
 - Los archivos de ventas anteriores siguen funcionando: el detalle de productos es una columna nueva y opcional.
+
+## Reportes
+
+La opción **14** abre un menú de reportes:
+
+1. **Ganancia por mes**: ventas, facturado, costos, ganancia y margen de cada mes, y cuánto subió o bajó la ganancia respecto del mes anterior (solo si ese mes anterior del calendario tuvo ganancia, para que el porcentaje tenga sentido).
+2. **Rentabilidad por producto**: ordenada por unidades, ganancia o margen. Usa las ventas con detalle de productos.
+3. **Pendientes**: ventas por cobrar y por entregar, las más viejas primero y con los días que llevan esperando.
+4. **Exportar para Excel**: guarda los reportes en `Documentos\Mateverso\reportes` como CSV con punto y coma y coma decimal, para abrirlos directo en Excel o Google Sheets.
+
+Los cálculos viven en `Reportes.cs`, separados de lo que se imprime en pantalla, y tienen sus pruebas en `ReportesTests.cs`.
 
 ## Copias de seguridad
 
@@ -82,3 +95,4 @@ Los datos reales (ventas, costos) **no están en este repositorio**: se guardan 
 - [x] v4: catálogo de productos con costos y reporte de productos más vendidos
 - [x] v5: copias de seguridad automáticas con fecha y restauración desde el menú
 - [x] Pruebas automáticas con xUnit
+- [x] v6: reportes (por mes, por producto, pendientes) y exportación a Excel

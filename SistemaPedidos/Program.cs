@@ -73,6 +73,7 @@ namespace SistemaPedidos
                     case 11: MenuCatalogo(); break;
                     case 12: ProductosMasVendidos(); break;
                     case 13: MenuCopias(); break;
+                    case 14: MenuReportes(); break;
                     case 0: Console.WriteLine("¡Hasta luego!"); break;
                     default: Console.WriteLine("Opción inválida."); break;
                 }
@@ -96,6 +97,7 @@ namespace SistemaPedidos
             Console.WriteLine("11. Catálogo de productos");
             Console.WriteLine("12. Productos más vendidos");
             Console.WriteLine("13. Copias de seguridad");
+            Console.WriteLine("14. Reportes (por mes, por producto, pendientes, Excel)");
             Console.WriteLine("0. Salir");
         }
  
@@ -879,6 +881,155 @@ namespace SistemaPedidos
             Console.WriteLine("Se cuentan " + conDetalle + " de " + registro.Cantidad
                 + " ventas (las demás no tienen detalle de productos).");
             Console.WriteLine("La ganancia es de los productos, sin descontar bolsa, sticker ni tarjeta.");
+        }
+
+        // ---------- Reportes ----------
+
+        static void MenuReportes()
+        {
+            if (registro.Cantidad == 0)
+            {
+                Console.WriteLine("Todavía no hay ventas cargadas.");
+                return;
+            }
+
+            int opcion = -1;
+            while (opcion != 0)
+            {
+                Console.WriteLine("--- REPORTES ---");
+                Console.WriteLine("1. Ganancia por mes (con margen y variación)");
+                Console.WriteLine("2. Rentabilidad por producto");
+                Console.WriteLine("3. Pendientes: por cobrar y por entregar");
+                Console.WriteLine("4. Exportar reportes para Excel");
+                Console.WriteLine("0. Volver");
+                opcion = LeerEntero("Opción: ");
+                Console.WriteLine();
+
+                switch (opcion)
+                {
+                    case 1: ReporteMensual(); break;
+                    case 2: ReporteProductos(); break;
+                    case 3: ReportePendientes(); break;
+                    case 4: ExportarReportes(); break;
+                    case 0: break;
+                    default: Console.WriteLine("Opción inválida."); break;
+                }
+                if (opcion != 0)
+                {
+                    Console.WriteLine();
+                }
+            }
+        }
+
+        static string TextoVariacion(decimal? variacion)
+        {
+            if (!variacion.HasValue)
+            {
+                return "-";
+            }
+            return variacion.Value.ToString("+0;-0;0", CultureInfo.InvariantCulture) + "%";
+        }
+
+        static void ReporteMensual()
+        {
+            List<FilaMes> meses = Reportes.PorMes(registro.Ventas);
+            Console.WriteLine("Mes      Ventas   Facturado     Costos    Ganancia  Margen  Vs. mes anterior");
+            foreach (FilaMes f in meses)
+            {
+                Console.WriteLine("{0}  {1,6}  {2,10}  {3,10}  {4,10}  {5,5}%  {6,10}",
+                    f.Mes, f.Ventas, Formato.Pesos(f.Facturado), Formato.Pesos(f.Costos),
+                    Formato.Pesos(f.Ganancia), f.Margen.ToString("0", CultureInfo.InvariantCulture),
+                    TextoVariacion(f.VariacionGanancia));
+            }
+            Console.WriteLine();
+            Console.WriteLine("Margen = ganancia / facturado. \"Vs. mes anterior\" compara la ganancia");
+            Console.WriteLine("solo si el mes anterior del calendario también tuvo ventas con ganancia.");
+        }
+
+        static void ReporteProductos()
+        {
+            int conDetalle = registro.CantidadConDetalle();
+            if (conDetalle == 0)
+            {
+                Console.WriteLine("Todavía no hay ventas con productos del catálogo.");
+                Console.WriteLine("Se cuentan las ventas nuevas cargadas con la opción 2 desde el catálogo.");
+                return;
+            }
+
+            Console.WriteLine("Ordenar por: 1. Unidades  2. Ganancia  3. Margen");
+            int orden = LeerEnteroConActual("Orden (Enter = 2): ", 2, 1, 3);
+            Console.WriteLine();
+
+            List<FilaProducto> filas = Reportes.PorProducto(registro.Ventas, (OrdenProductos)orden);
+            int maximo = 20;
+            Console.WriteLine("Producto                                  Unid.   Facturado    Ganancia  Margen");
+            for (int i = 0; i < filas.Count && i < maximo; i++)
+            {
+                FilaProducto f = filas[i];
+                string nombre = f.Nombre.Length > 40 ? f.Nombre.Substring(0, 37) + "..." : f.Nombre;
+                Console.WriteLine("{0,-40} {1,6}  {2,10}  {3,10}  {4,5}%",
+                    nombre, f.Unidades, Formato.Pesos(f.Facturado), Formato.Pesos(f.Ganancia),
+                    f.Margen.ToString("0", CultureInfo.InvariantCulture));
+            }
+            if (filas.Count > maximo)
+            {
+                Console.WriteLine("(Se muestran los primeros " + maximo + " de " + filas.Count + ")");
+            }
+            Console.WriteLine();
+            Console.WriteLine("Se cuentan " + conDetalle + " de " + registro.Cantidad
+                + " ventas (las demás no tienen detalle de productos).");
+            Console.WriteLine("La ganancia es de los productos, sin descontar bolsa, sticker ni tarjeta.");
+        }
+
+        static void ReportePendientes()
+        {
+            MostrarPendientes("POR COBRAR (pedidos sin pagar)", EstadoVenta.Pedido);
+            Console.WriteLine();
+            MostrarPendientes("POR ENTREGAR (pagadas, falta entregar)", EstadoVenta.Pagado);
+        }
+
+        static void MostrarPendientes(string titulo, EstadoVenta estado)
+        {
+            List<Venta> lista = Reportes.Pendientes(registro.Ventas, estado);
+            decimal total = 0;
+            Console.WriteLine("--- " + titulo + " ---");
+            if (lista.Count == 0)
+            {
+                Console.WriteLine("No hay ventas en este estado.");
+                return;
+            }
+            foreach (Venta v in lista)
+            {
+                int dias = Reportes.DiasDeEspera(v, DateTime.Today);
+                string productos = v.Productos.Length > 38 ? v.Productos.Substring(0, 35) + "..." : v.Productos;
+                Console.WriteLine("#{0,-3} {1:dd/MM/yyyy}  hace {2,3} días  {3,9}  {4}",
+                    v.Numero, v.Fecha, dias, Formato.Pesos(v.PrecioVenta), productos);
+                total += v.PrecioVenta;
+            }
+            Console.WriteLine("Total: " + Formato.Pesos(total) + " en " + lista.Count + " venta(s). Las más viejas van primero.");
+        }
+
+        static void ExportarReportes()
+        {
+            string documentos = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string carpeta = Path.Combine(documentos, "Mateverso", "reportes");
+            string fecha = DateTime.Today.ToString("yyyy-MM-dd");
+
+            string rutaMensual = Path.Combine(carpeta, "reporte-mensual-" + fecha + ".csv");
+            Reportes.ExportarMensual(Reportes.PorMes(registro.Ventas), rutaMensual);
+            Console.WriteLine("Guardado: " + rutaMensual);
+
+            if (registro.CantidadConDetalle() > 0)
+            {
+                string rutaProductos = Path.Combine(carpeta, "reporte-productos-" + fecha + ".csv");
+                Reportes.ExportarProductos(Reportes.PorProducto(registro.Ventas, OrdenProductos.Ganancia), rutaProductos);
+                Console.WriteLine("Guardado: " + rutaProductos);
+            }
+            else
+            {
+                Console.WriteLine("No se exportó el reporte de productos: todavía no hay ventas con detalle.");
+            }
+            Console.WriteLine("Se abren con Excel o Google Sheets (separados por punto y coma).");
         }
 
         // ---------- Copias de seguridad ----------
