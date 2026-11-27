@@ -17,6 +17,7 @@ Programa de consola en **C#** para llevar el registro de ventas de mi emprendimi
 - Exporta una copia en CSV que abre Excel o Google Sheets.
 - **Catálogo de productos** con costo y precio: se agregan, editan y eliminan desde el menú. Al cargar una venta se eligen del catálogo (por número o por parte del nombre) y el programa completa el detalle, el costo y un precio sugerido.
 - **Productos más vendidos**: unidades, facturado y ganancia por producto, ordenados por unidades o por ganancia.
+- **Vincular ventas viejas al catálogo**: reconoce los productos del texto de cada venta anterior ("Imperial Negro + 2 x Bombilla"), los une con el catálogo y los ajusta a lo registrado, sin cambiar costos, precios ni ganancias, para que cuenten en los reportes por producto.
 - **Reportes**: ganancia por mes con margen y variación contra el mes anterior, rentabilidad por producto (por unidades, ganancia o margen), lista de pendientes de cobro y de entrega (con los días de espera) y exportación a Excel.
 
 ## Conceptos de la materia que se usan
@@ -34,6 +35,7 @@ Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T
 | `ArchivoProductos.cs` | Guardar y cargar el catálogo (`productos.csv`) |
 | `RegistroVentas.cs` | Lista de ventas, búsqueda, borrado y reportes |
 | `FiltroVentas.cs` | Criterios de búsqueda (texto, fechas, estado, medio de pago) |
+| `Vinculador.cs` | Reconoce productos en el texto de ventas viejas y arma su detalle |
 | `Reportes.cs` | Cálculo de los reportes (por mes, por producto, pendientes) y exportación a CSV |
 | `CopiasSeguridad.cs` | Copias con fecha, poda de las viejas y restauración |
 | `ArchivoVentas.cs` | Guardar y cargar el archivo propio del programa |
@@ -56,6 +58,15 @@ Clases y encapsulación (`private set`), propiedades calculadas, `enum`, `List<T
 - Cada venta guarda el **nombre, el costo y el precio del día** de cada producto. Si después cambia el catálogo o se borra un producto, las ventas anteriores no se modifican.
 - Opción **12**: productos más vendidos. Solo cuenta las ventas cargadas desde el catálogo; las importadas de la planilla o escritas a mano no tienen detalle de productos.
 - Los archivos de ventas anteriores siguen funcionando: el detalle de productos es una columna nueva y opcional.
+
+### Vincular ventas viejas
+
+Las ventas cargadas antes del catálogo (o importadas de la planilla) solo tienen un texto con los productos, así que no cuentan en los reportes por producto. La opción **11 > 5** las vincula:
+
+- **Automático**: solo las ventas donde todos los nombres coinciden exacto con el catálogo (sin importar mayúsculas ni tildes).
+- **Una por una**: si el nombre es parecido, propone el producto y se confirma con Enter; si no se reconoce, se elige del catálogo por número o buscando por texto. Se puede saltar una venta o terminar cuando se quiera.
+
+Los costos y precios del catálogo de hoy se reparten proporcionalmente para que sumen exactamente lo que la venta ya tenía registrado (el costo sin bolsa, sticker ni tarjeta, y el precio de venta). Por eso el detalle de las ventas viejas es **estimado**, pero los totales y la ganancia de cada venta no cambian. Reconocer nombres y repartir los valores está en `Vinculador.cs`, con sus pruebas.
 
 ## Reportes
 

@@ -754,6 +754,7 @@ namespace SistemaPedidos
                 Console.WriteLine("2. Agregar un producto");
                 Console.WriteLine("3. Editar un producto");
                 Console.WriteLine("4. Eliminar un producto");
+                Console.WriteLine("5. Vincular ventas viejas al catálogo");
                 Console.WriteLine("0. Volver");
                 opcion = LeerEntero("Opción: ");
                 Console.WriteLine();
@@ -764,6 +765,7 @@ namespace SistemaPedidos
                     case 2: AgregarProducto(); break;
                     case 3: EditarProducto(); break;
                     case 4: EliminarProducto(); break;
+                    case 5: MenuVincular(); break;
                     case 0: break;
                     default: Console.WriteLine("Opción inválida."); break;
                 }
@@ -881,6 +883,257 @@ namespace SistemaPedidos
             Console.WriteLine("Se cuentan " + conDetalle + " de " + registro.Cantidad
                 + " ventas (las demás no tienen detalle de productos).");
             Console.WriteLine("La ganancia es de los productos, sin descontar bolsa, sticker ni tarjeta.");
+        }
+
+        // ---------- Vincular ventas viejas con el catálogo ----------
+
+        static bool Afirmativo(string respuesta)
+        {
+            return respuesta == null || respuesta.Trim() == "" || respuesta.Trim().ToLower() == "s";
+        }
+
+        static List<Venta> VentasSinDetalle()
+        {
+            List<Venta> lista = new List<Venta>();
+            foreach (Venta v in registro.Ventas)
+            {
+                if (v.Items.Count == 0 && Vinculador.Partes(v.Productos).Count > 0)
+                {
+                    lista.Add(v);
+                }
+            }
+            return lista;
+        }
+
+        static List<ParteElegida> PartesElegidas(List<PropuestaParte> propuestas)
+        {
+            List<ParteElegida> partes = new List<ParteElegida>();
+            foreach (PropuestaParte p in propuestas)
+            {
+                partes.Add(new ParteElegida(p.Producto, p.Cantidad));
+            }
+            return partes;
+        }
+
+        static void MenuVincular()
+        {
+            if (catalogo.Cantidad == 0)
+            {
+                Console.WriteLine("Primero cargá productos en el catálogo.");
+                return;
+            }
+            List<Venta> pendientes = VentasSinDetalle();
+            if (pendientes.Count == 0)
+            {
+                Console.WriteLine("Todas las ventas ya tienen el detalle de productos.");
+                return;
+            }
+
+            Console.WriteLine("--- VINCULAR VENTAS VIEJAS AL CATÁLOGO ---");
+            Console.WriteLine("Hay " + pendientes.Count + " de " + registro.Cantidad + " ventas sin detalle de productos.");
+            Console.WriteLine("Vincularlas hace que cuenten en los reportes por producto.");
+            Console.WriteLine("No cambia el costo, el precio ni la ganancia de ninguna venta: los valores");
+            Console.WriteLine("del catálogo se ajustan a lo que ya está registrado en cada venta (son estimados).");
+            Console.WriteLine();
+            Console.WriteLine("1. Automático: solo las ventas donde todos los nombres coinciden exacto");
+            Console.WriteLine("2. Una por una: confirmás o elegís el producto en cada venta");
+            Console.WriteLine("0. Volver");
+            int opcion = LeerEntero("Opción: ");
+            Console.WriteLine();
+
+            if (opcion == 1)
+            {
+                VincularAutomatico(pendientes);
+            }
+            else if (opcion == 2)
+            {
+                VincularUnaPorUna(pendientes);
+            }
+        }
+
+        static void VincularAutomatico(List<Venta> pendientes)
+        {
+            List<Venta> seguras = new List<Venta>();
+            List<List<PropuestaParte>> propuestas = new List<List<PropuestaParte>>();
+            foreach (Venta v in pendientes)
+            {
+                List<PropuestaParte> props = Vinculador.Interpretar(v.Productos, catalogo);
+                bool todoExacto = props.Count > 0;
+                foreach (PropuestaParte p in props)
+                {
+                    if (p.Tipo != Coincidencia.Exacta)
+                    {
+                        todoExacto = false;
+                    }
+                }
+                if (todoExacto)
+                {
+                    seguras.Add(v);
+                    propuestas.Add(props);
+                }
+            }
+
+            if (seguras.Count == 0)
+            {
+                Console.WriteLine("Ninguna venta coincide exacto con el catálogo. Probá la opción 2.");
+                return;
+            }
+
+            Console.WriteLine("Se pueden vincular " + seguras.Count + " ventas sin dudas. Ejemplos:");
+            for (int i = 0; i < seguras.Count && i < 5; i++)
+            {
+                Console.WriteLine("  #" + seguras[i].Numero + "  " + seguras[i].Productos);
+            }
+            Console.WriteLine();
+            Console.Write("¿Vincularlas? (Enter = sí, n = no): ");
+            if (!Afirmativo(Console.ReadLine()))
+            {
+                Console.WriteLine("No se cambió nada.");
+                return;
+            }
+
+            for (int i = 0; i < seguras.Count; i++)
+            {
+                seguras[i].Items.AddRange(Vinculador.CrearItems(seguras[i], PartesElegidas(propuestas[i])));
+            }
+            Guardar();
+            Console.WriteLine("Listo: " + seguras.Count + " ventas vinculadas. Quedan "
+                + VentasSinDetalle().Count + " para revisar una por una (opción 2).");
+        }
+
+        static void VincularUnaPorUna(List<Venta> pendientes)
+        {
+            Console.WriteLine("Para cada venta: Enter confirma lo propuesto. Podés saltar una venta o terminar cuando quieras.");
+            int vinculadas = 0;
+            int saltadas = 0;
+
+            foreach (Venta v in pendientes)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Venta #" + v.Numero + "  " + v.Fecha.ToString("dd/MM/yyyy") + "  " + Formato.Pesos(v.PrecioVenta));
+                Console.WriteLine("  Productos: " + v.Productos);
+
+                List<ParteElegida> elegidas = new List<ParteElegida>();
+                bool saltar = false;
+                bool terminar = false;
+
+                foreach (PropuestaParte p in Vinculador.Interpretar(v.Productos, catalogo))
+                {
+                    Producto producto = null;
+                    if (p.Tipo == Coincidencia.Exacta)
+                    {
+                        producto = p.Producto;
+                        Console.WriteLine("  OK  \"" + p.Texto + "\" -> " + producto.Nombre);
+                    }
+                    else
+                    {
+                        if (p.Tipo == Coincidencia.Parecida)
+                        {
+                            Console.Write("  ¿\"" + p.Texto + "\" es \"" + p.Producto.Nombre
+                                + "\"? (Enter = sí, n = elegir otro, x = saltar venta, q = terminar): ");
+                            string r = (Console.ReadLine() ?? "").Trim().ToLower();
+                            if (r == "q") { terminar = true; }
+                            else if (r == "x") { saltar = true; }
+                            else if (r == "") { producto = p.Producto; }
+                        }
+                        if (!terminar && !saltar && producto == null)
+                        {
+                            producto = ElegirProductoDelCatalogo(p, out saltar, out terminar);
+                        }
+                    }
+
+                    if (terminar || saltar || producto == null)
+                    {
+                        break;
+                    }
+                    elegidas.Add(new ParteElegida(producto, p.Cantidad));
+                }
+
+                if (terminar)
+                {
+                    break;
+                }
+                if (saltar || elegidas.Count != Vinculador.Partes(v.Productos).Count)
+                {
+                    saltadas++;
+                    Console.WriteLine("  (venta saltada)");
+                    continue;
+                }
+
+                List<ItemVenta> items = Vinculador.CrearItems(v, elegidas);
+                Console.WriteLine("  Detalle estimado:");
+                foreach (ItemVenta item in items)
+                {
+                    Console.WriteLine("     - " + item.ATexto() + "  (costo " + Formato.Pesos(item.CostoTotal)
+                        + ", precio " + Formato.Pesos(item.PrecioTotal) + ")");
+                }
+                Console.Write("  ¿Guardar este detalle? (Enter = sí, n = no): ");
+                if (Afirmativo(Console.ReadLine()))
+                {
+                    v.Items.AddRange(items);
+                    Guardar();
+                    vinculadas++;
+                }
+                else
+                {
+                    saltadas++;
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Terminado: " + vinculadas + " vinculadas, " + saltadas + " saltadas. Quedan "
+                + VentasSinDetalle().Count + " sin detalle.");
+        }
+
+        // Pide elegir un producto del catálogo para una parte que no se pudo reconocer sola.
+        // Devuelve null si se salta la venta; "terminar" indica que se quiere cortar todo.
+        static Producto ElegirProductoDelCatalogo(PropuestaParte p, out bool saltar, out bool terminar)
+        {
+            saltar = false;
+            terminar = false;
+            List<Producto> opciones = p.Alternativas;
+
+            while (true)
+            {
+                Console.WriteLine("  No sé cuál es \"" + p.Texto + "\". Opciones:");
+                if (opciones.Count == 0)
+                {
+                    Console.WriteLine("     (ninguna parecida)");
+                }
+                foreach (Producto o in opciones)
+                {
+                    Console.WriteLine("     " + o.ALinea());
+                }
+                Console.Write("  Escribí el número de un producto, o texto para buscar (Enter = saltar venta, q = terminar): ");
+                string r = (Console.ReadLine() ?? "").Trim();
+
+                if (r == "")
+                {
+                    saltar = true;
+                    return null;
+                }
+                if (r.ToLower() == "q")
+                {
+                    terminar = true;
+                    return null;
+                }
+                int id;
+                if (int.TryParse(r, out id))
+                {
+                    Producto elegido = catalogo.Buscar(id);
+                    if (elegido != null)
+                    {
+                        return elegido;
+                    }
+                    Console.WriteLine("  No hay un producto con ese número.");
+                    continue;
+                }
+                opciones = catalogo.BuscarPorTexto(r);
+                if (opciones.Count > 10)
+                {
+                    opciones = opciones.GetRange(0, 10);
+                }
+            }
         }
 
         // ---------- Reportes ----------
