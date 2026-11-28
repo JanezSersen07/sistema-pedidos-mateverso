@@ -127,7 +127,7 @@ dialogo.addEventListener("click", (e) => { if (e.target === dialogo) dialogo.clo
 
 // ---------- Rutas ----------
 
-const rutas = { resumen: vistaResumen, ventas: vistaVentas, catalogo: vistaCatalogo, reportes: vistaReportes };
+const rutas = { resumen: vistaResumen, ventas: vistaVentas, catalogo: vistaCatalogo, reportes: vistaReportes, copias: vistaCopias };
 let rutaActual = "resumen";
 
 async function irA() {
@@ -346,6 +346,7 @@ async function detalleVenta(numero) {
         } catch (error) { avisar(error.message, true); }
       }
     }, "Eliminar"),
+    h("button", { clase: "boton suave", onclick: () => editarVenta(v) }, "Editar"),
     h("button", { clase: "boton suave", onclick: () => dialogo.close() }, "Cerrar")];
   if (v.estado < 3) {
     const siguiente = v.estado + 1;
@@ -363,6 +364,55 @@ async function detalleVenta(numero) {
         h("li", {}, h("b", {}, "Ganancia"), h("b", {}, dinero(v.ganancia) + " (" + porcentaje(v.margen) + ")"))),
       v.nota ? h("p", {}, h("b", {}, "Nota: "), v.nota) : null,
     ], pie);
+}
+
+// ---------- Editar venta ----------
+
+function editarVenta(v) {
+  const fecha = h("input", { type: "date", value: v.fecha, max: hoyIso() });
+  const productos = h("input", { type: "text", value: v.productos, maxlength: "300" });
+  const costo = h("input", { type: "number", min: "0", step: "1", value: Math.round(v.costoTotal), inputmode: "numeric" });
+  const precio = h("input", { type: "number", min: "1", step: "1", value: Math.round(v.precioVenta), inputmode: "numeric" });
+  const medio = h("select", {}, Object.entries(MEDIOS).map(([valor, nombre]) => h("option", { value: valor, selected: Number(valor) === v.medio }, nombre)));
+  const estado = h("select", {}, Object.entries(NOMBRE_ESTADO).map(([valor, nombre]) => h("option", { value: valor, selected: Number(valor) === v.estado }, nombre)));
+  const nota = h("textarea", { rows: "2", maxlength: "300" }, v.nota);
+  const regalo = h("input", { type: "checkbox", checked: v.esRegalo });
+  const error = h("div", { clase: "error-form", hidden: true });
+  const campo = (titulo, control) => h("label", { clase: "campo" }, titulo, control);
+
+  const guardar = h("button", { clase: "boton", type: "button" }, "Guardar cambios");
+  guardar.addEventListener("click", async () => {
+    error.hidden = true;
+    guardar.disabled = true;
+    try {
+      await api("/api/ventas/" + v.numero, {
+        metodo: "PUT",
+        cuerpo: {
+          fecha: fecha.value, productos: productos.value,
+          costoTotal: Number(costo.value) || 0, precioVenta: Number(precio.value) || 0,
+          medio: Number(medio.value), estado: Number(estado.value),
+          esRegalo: regalo.checked, nota: nota.value,
+        },
+      });
+      dialogo.close();
+      avisar("Venta #" + v.numero + " actualizada.");
+      await refrescar();
+    } catch (e) {
+      error.textContent = e.message;
+      error.hidden = false;
+      guardar.disabled = false;
+    }
+  });
+
+  abrirDialogo("Editar venta #" + v.numero,
+    [error,
+      v.items.length ? h("p", { clase: "vacio" }, "El detalle de productos del catálogo no cambia al editar; se modifican solo los datos de abajo.") : null,
+      campo("Productos (texto de la venta)", productos),
+      h("div", { clase: "fila-campos" }, campo("Costo total", costo), campo("Precio de venta", precio)),
+      h("div", { clase: "fila-campos" }, campo("Fecha", fecha), campo("Medio de pago", medio), campo("Estado", estado)),
+      campo("Nota (opcional)", nota),
+      h("label", { clase: "campo casilla" }, regalo, "Es un regalo")],
+    [h("button", { clase: "boton suave", type: "button", onclick: () => detalleVenta(v.numero) }, "Cancelar"), guardar]);
 }
 
 // ---------- Nueva venta ----------
@@ -594,7 +644,11 @@ async function vistaReportes(contenedor) {
   }, texto);
 
   contenedor.replaceChildren(
-    h("div", { clase: "cabecera" }, h("div", {}, h("h1", {}, "Reportes"), h("p", {}, "Calculados sobre todas las ventas cargadas."))),
+    h("div", { clase: "cabecera" },
+      h("div", {}, h("h1", {}, "Reportes"), h("p", {}, "Calculados sobre todas las ventas cargadas.")),
+      h("div", { clase: "acciones" },
+        h("a", { clase: "boton suave", href: "/api/exportar/mensual", download: "" }, "Descargar por mes"),
+        h("a", { clase: "boton suave", href: "/api/exportar/productos?orden=" + ordenProductos, download: "" }, "Descargar por producto"))),
 
     h("section", { clase: "bloque" },
       h("h2", {}, "Por mes"),
@@ -623,6 +677,75 @@ async function vistaReportes(contenedor) {
           { titulo: "Ganancia", num: true, celda: (p) => dinero(p.ganancia) },
           { titulo: "Margen", num: true, celda: (p) => porcentaje(p.margen) }],
           productos)));
+}
+
+// ---------- Copias de seguridad ----------
+
+async function vistaCopias(contenedor) {
+  const copias = await api("/api/copias");
+
+  const crear = h("button", { clase: "boton", type: "button" }, "Crear copia ahora");
+  crear.addEventListener("click", async () => {
+    crear.disabled = true;
+    try {
+      const copia = await api("/api/copias", { metodo: "POST" });
+      avisar("Copia creada: " + copia.nombre);
+      await refrescar();
+    } catch (e) {
+      avisar(e.message, true);
+      crear.disabled = false;
+    }
+  });
+
+  contenedor.replaceChildren(
+    h("div", { clase: "cabecera" },
+      h("div", {}, h("h1", {}, "Copias y descargas"),
+        h("p", {}, "El panel hace una copia sola el primer cambio de cada día y guarda las últimas 30.")),
+      crear),
+
+    h("section", { clase: "bloque" },
+      h("h2", {}, "Descargar para Excel"),
+      h("div", { clase: "acciones" },
+        h("a", { clase: "boton suave", href: "/api/exportar/ventas", download: "" }, "Todas las ventas"),
+        h("a", { clase: "boton suave", href: "/api/exportar/mensual", download: "" }, "Reporte por mes"),
+        h("a", { clase: "boton suave", href: "/api/exportar/productos?orden=2", download: "" }, "Reporte por producto"))),
+
+    h("section", { clase: "bloque" },
+      h("h2", {}, "Copias guardadas (" + copias.length + ")"),
+      copias.length === 0
+        ? h("p", { clase: "vacio" }, "Todavía no hay copias. Se crean solas al guardar, o con el botón de arriba.")
+        : tabla([
+          { titulo: "Archivo", celda: (c) => c.nombre },
+          { titulo: "Fecha", celda: (c) => c.fecha },
+          { titulo: "Tamaño", num: true, celda: (c) => c.kilobytes + " KB" },
+          { titulo: "", num: true, celda: (c) => h("button", { clase: "boton chico suave", onclick: () => restaurarCopia(c) }, "Restaurar") }],
+          copias)));
+}
+
+function restaurarCopia(copia) {
+  const confirmacion = h("input", { type: "text", autocomplete: "off", placeholder: "RESTAURAR" });
+  const error = h("div", { clase: "error-form", hidden: true });
+  const boton = h("button", { clase: "boton peligro", type: "button" }, "Restaurar esta copia");
+  boton.addEventListener("click", async () => {
+    error.hidden = true;
+    boton.disabled = true;
+    try {
+      await api("/api/copias/restaurar", { metodo: "POST", cuerpo: { nombre: copia.nombre, confirmacion: confirmacion.value } });
+      dialogo.close();
+      avisar("Copia restaurada. Se resguardó lo que había antes.");
+      await refrescar();
+    } catch (e) {
+      error.textContent = e.message;
+      error.hidden = false;
+      boton.disabled = false;
+    }
+  });
+  abrirDialogo("Restaurar copia",
+    [error,
+      h("p", {}, "Vas a reemplazar todas las ventas y el catálogo actuales por los de ", h("b", {}, copia.nombre), " (" + copia.fecha + "). Lo que hay ahora se resguarda antes en la carpeta de copias."),
+      h("label", { clase: "campo" }, "Para confirmar, escribí RESTAURAR", confirmacion)],
+    [h("button", { clase: "boton suave", type: "button", onclick: () => dialogo.close() }, "Cancelar"), boton]);
+  confirmacion.focus();
 }
 
 irA();

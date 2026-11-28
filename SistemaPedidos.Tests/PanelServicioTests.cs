@@ -263,6 +263,153 @@ namespace SistemaPedidos.Tests
             Assert.Equal(404, Falla(() => servicio.EliminarVenta(2)).Codigo);
         }
 
+        // ---------- Editar ventas ----------
+
+        private static VentaEdicionDto Edicion(VentaDto v)
+        {
+            return new VentaEdicionDto
+            {
+                Fecha = v.Fecha, Productos = v.Productos, CostoTotal = v.CostoTotal, PrecioVenta = v.PrecioVenta,
+                Medio = v.Medio, Estado = v.Estado, EsRegalo = v.EsRegalo, Nota = v.Nota
+            };
+        }
+
+        [Fact]
+        public void EditarVenta_CambiaLosDatosYSeGuardan()
+        {
+            VentaEdicionDto datos = Edicion(servicio.ObtenerVenta(2));
+            datos.PrecioVenta = 9000;
+            datos.Nota = "  retira\nel sábado ";
+            datos.Medio = 3;
+            datos.Fecha = "2026-11-11";
+            datos.EsRegalo = true;
+            VentaDto v = servicio.EditarVenta(2, datos);
+
+            Assert.Equal(5500m, v.Ganancia);
+            Assert.Equal("retira el sábado", v.Nota);
+            VentaDto releida = servicio.ObtenerVenta(2);
+            Assert.Equal(9000m, releida.PrecioVenta);
+            Assert.Equal("Transferencia", releida.MedioNombre);
+            Assert.Equal("2026-11-11", releida.Fecha);
+            Assert.True(releida.EsRegalo);
+        }
+
+        [Fact]
+        public void EditarVenta_PermiteCorregirElEstadoEnAmbosSentidos()
+        {
+            VentaEdicionDto datos = Edicion(servicio.ObtenerVenta(1));
+            datos.Estado = 1;
+            Assert.Equal("Pedido", servicio.EditarVenta(1, datos).EstadoNombre);
+        }
+
+        [Fact]
+        public void EditarVenta_NoTocaElDetalleDelCatalogo()
+        {
+            servicio.CrearVenta(NuevaConItems(1, 1));
+            VentaEdicionDto datos = Edicion(servicio.ObtenerVenta(4));
+            datos.Productos = "Mate Imperial (corregido)";
+            VentaDto v = servicio.EditarVenta(4, datos);
+            Assert.Equal(1, v.Items.Count);
+            Assert.Equal("Mate Imperial", v.Items[0].Nombre);
+        }
+
+        [Fact]
+        public void EditarVenta_DatosInvalidos_DanErrorYNoCambianNada()
+        {
+            VentaEdicionDto base0 = Edicion(servicio.ObtenerVenta(2));
+
+            VentaEdicionDto precio = Edicion(servicio.ObtenerVenta(2));
+            precio.PrecioVenta = 0;
+            Falla(() => servicio.EditarVenta(2, precio));
+
+            VentaEdicionDto costo = Edicion(servicio.ObtenerVenta(2));
+            costo.CostoTotal = -1;
+            Falla(() => servicio.EditarVenta(2, costo));
+
+            VentaEdicionDto sinTexto = Edicion(servicio.ObtenerVenta(2));
+            sinTexto.Productos = "  ";
+            Falla(() => servicio.EditarVenta(2, sinTexto));
+
+            VentaEdicionDto fecha = Edicion(servicio.ObtenerVenta(2));
+            fecha.Fecha = "2027-01-01";
+            Falla(() => servicio.EditarVenta(2, fecha));
+            fecha.Fecha = "";
+            Falla(() => servicio.EditarVenta(2, fecha));
+
+            VentaEdicionDto medio = Edicion(servicio.ObtenerVenta(2));
+            medio.Medio = 7;
+            Falla(() => servicio.EditarVenta(2, medio));
+
+            Assert.Equal(404, Falla(() => servicio.EditarVenta(99, base0)).Codigo);
+            Assert.Equal(8000m, servicio.ObtenerVenta(2).PrecioVenta);
+        }
+
+        // ---------- Copias de seguridad ----------
+
+        [Fact]
+        public void Copias_CrearManualYListar()
+        {
+            Assert.Equal(0, servicio.ListarCopias().Count);
+            CopiaDto copia = servicio.CrearCopia();
+            Assert.Contains("-manual-", copia.Nombre);
+            Assert.True(copia.Kilobytes >= 1);
+            Assert.Equal(1, servicio.ListarCopias().Count);
+        }
+
+        [Fact]
+        public void Copias_RestaurarDevuelveLosDatosYResguardaLoActual()
+        {
+            CopiaDto copia = servicio.CrearCopia();
+            servicio.EliminarVenta(1);
+            servicio.EliminarVenta(2);
+            Assert.Equal(1, servicio.ListarVentas("", "", "", 0, 0).Count);
+
+            servicio.RestaurarCopia(new RestauracionDto { Nombre = copia.Nombre, Confirmacion = "restaurar" });
+
+            Assert.Equal(3, servicio.ListarVentas("", "", "", 0, 0).Count);
+            Assert.True(servicio.ListarCopias().Any(c => c.Nombre.Contains("antes-de-restaurar")));
+        }
+
+        [Fact]
+        public void Copias_RestaurarSinConfirmarONombreRaro_NoHaceNada()
+        {
+            CopiaDto copia = servicio.CrearCopia();
+            servicio.EliminarVenta(1);
+
+            Falla(() => servicio.RestaurarCopia(new RestauracionDto { Nombre = copia.Nombre, Confirmacion = "si" }));
+            Falla(() => servicio.RestaurarCopia(new RestauracionDto { Nombre = copia.Nombre, Confirmacion = "" }));
+            Assert.Equal(404, Falla(() => servicio.RestaurarCopia(new RestauracionDto { Nombre = "..\\mateverso.db", Confirmacion = "RESTAURAR" })).Codigo);
+            Assert.Equal(404, Falla(() => servicio.RestaurarCopia(new RestauracionDto { Nombre = "no-existe.db", Confirmacion = "RESTAURAR" })).Codigo);
+            Assert.Equal(2, servicio.ListarVentas("", "", "", 0, 0).Count);
+        }
+
+        // ---------- Exportar ----------
+
+        [Fact]
+        public void Exportar_GeneraCsvConEncabezadoYFilas()
+        {
+            string mensual = System.Text.Encoding.UTF8.GetString(servicio.CsvMensual());
+            Assert.Contains("Mes;Ventas;Facturado", mensual);
+            Assert.Contains("2026-10", mensual);
+
+            string productos = System.Text.Encoding.UTF8.GetString(servicio.CsvProductos(2));
+            Assert.Contains("Producto;Unidades", productos);
+
+            string ventas = System.Text.Encoding.UTF8.GetString(servicio.CsvVentas());
+            Assert.Contains("Bombilla Acero", ventas);
+        }
+
+        [Fact]
+        public void Exportar_NoDejaArchivosTemporalesNiTocaLosDatos()
+        {
+            string[] antes = Directory.GetFiles(Path.GetTempPath(), "mateverso-????????????????????????????????.csv");
+            servicio.CsvMensual();
+            servicio.CsvVentas();
+            string[] despues = Directory.GetFiles(Path.GetTempPath(), "mateverso-????????????????????????????????.csv");
+            Assert.Equal(antes.Length, despues.Length);
+            Assert.Equal(3, servicio.ListarVentas("", "", "", 0, 0).Count);
+        }
+
         // ---------- Catálogo ----------
 
         [Fact]

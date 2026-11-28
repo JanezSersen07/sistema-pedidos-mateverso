@@ -112,9 +112,12 @@ Y abrí <http://localhost:5080>. Para cerrarlo, `Ctrl+C`.
 ![Panel de ventas (con datos de ejemplo)](captura-panel.png)
 
 - **Resumen**: ganancia, facturado, ticket promedio, gráfico mes a mes y lo que falta cobrar o entregar (con botón para avanzar el estado).
-- **Ventas**: búsqueda y filtros, detalle de cada venta, alta con productos del catálogo (costo, precio y ganancia en vivo) y borrado.
+- **Ventas**: búsqueda y filtros, detalle de cada venta, alta con productos del catálogo (costo, precio y ganancia en vivo), edición y borrado.
 - **Catálogo**: alta, edición y borrado de productos. Las ventas viejas conservan el costo y precio de su día.
-- **Reportes**: por mes (con variación) y por producto.
+- **Reportes**: por mes (con variación) y por producto, con descarga en CSV para Excel.
+- **Copias**: copia manual, lista de copias guardadas, restauración (pide escribir `RESTAURAR` y resguarda antes lo actual) y descarga de todas las ventas en CSV.
+
+Con esto el panel cubre todo lo que hacía la consola; la consola sigue funcionando para quien prefiera usarla.
 
 Detalles de diseño: la API es un conjunto chico de rutas `/api/...`; las reglas viven en `PanelServicio` (sin dependencias web, por eso se prueba con xUnit); cada cambio hace la copia del día antes de guardar; el servidor rechaza pedidos que no vengan de `localhost` o de la propia página. **No uses la consola y el panel a la vez**: cada uno lee la base al momento, pero guardar desde los dos al mismo tiempo puede pisar cambios.
 
@@ -149,3 +152,4 @@ Los datos reales (ventas, costos) **no están en este repositorio**: se guardan 
 - [x] v7: vincular ventas viejas al catálogo
 - [x] v8: base de datos SQLite con migración automática desde los CSV
 - [x] v9: panel web (API + página) sobre la misma base
+- [x] v10: el panel suma edición de ventas, copias de seguridad y descargas para Excel

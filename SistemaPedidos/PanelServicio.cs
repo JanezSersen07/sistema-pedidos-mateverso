@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 
 namespace SistemaPedidos
@@ -79,6 +80,32 @@ namespace SistemaPedidos
         public int Estado { get; set; }
         public bool EsRegalo { get; set; }
         public string Nota { get; set; }
+    }
+
+    // Lo que manda el panel para corregir una venta (el detalle de productos del catálogo no cambia)
+    public class VentaEdicionDto
+    {
+        public string Fecha { get; set; }
+        public string Productos { get; set; }
+        public decimal CostoTotal { get; set; }
+        public decimal PrecioVenta { get; set; }
+        public int Medio { get; set; }
+        public int Estado { get; set; }
+        public bool EsRegalo { get; set; }
+        public string Nota { get; set; }
+    }
+
+    public class CopiaDto
+    {
+        public string Nombre { get; set; }
+        public string Fecha { get; set; }
+        public long Kilobytes { get; set; }
+    }
+
+    public class RestauracionDto
+    {
+        public string Nombre { get; set; }
+        public string Confirmacion { get; set; }
     }
 
     public class ProductoNuevoDto
@@ -384,6 +411,176 @@ namespace SistemaPedidos
                     throw new ErrorPanel("No existe la venta #" + numero + ".", 404);
                 }
                 GuardarVentas(ventas);
+            }
+        }
+
+        // Corrige los datos de la venta. Como en la consola, el detalle de productos del catálogo no cambia.
+        public VentaDto EditarVenta(int numero, VentaEdicionDto datos)
+        {
+            if (datos == null)
+            {
+                throw new ErrorPanel("Faltan los datos de la venta.");
+            }
+            string productos = LimpiarTexto(datos.Productos);
+            if (productos == "")
+            {
+                throw new ErrorPanel("Escribí qué se vendió.");
+            }
+            if (datos.CostoTotal < 0)
+            {
+                throw new ErrorPanel("El costo no puede ser negativo.");
+            }
+            if (datos.PrecioVenta <= 0)
+            {
+                throw new ErrorPanel("El precio de venta tiene que ser mayor a cero.");
+            }
+            MedioPago medio = LeerMedio(datos.Medio);
+            EstadoVenta estado = LeerEstado(datos.Estado);
+            DateTime? fecha = LeerFechaOpcional(datos.Fecha, "fecha");
+            if (!fecha.HasValue)
+            {
+                throw new ErrorPanel("Falta la fecha.");
+            }
+            if (fecha.Value.Date > hoy().Date)
+            {
+                throw new ErrorPanel("La fecha no puede ser futura.");
+            }
+
+            lock (candado)
+            {
+                List<Venta> ventas = Ventas();
+                Venta venta = new RegistroVentas(ventas).Buscar(numero);
+                if (venta == null)
+                {
+                    throw new ErrorPanel("No existe la venta #" + numero + ".", 404);
+                }
+                venta.Corregir(fecha.Value, productos, datos.CostoTotal, datos.PrecioVenta, medio, estado);
+                venta.EsRegalo = datos.EsRegalo;
+                venta.Nota = LimpiarTexto(datos.Nota);
+                GuardarVentas(ventas);
+                return Convertir(venta, hoy());
+            }
+        }
+
+        // ---------- Copias de seguridad ----------
+
+        public List<CopiaDto> ListarCopias()
+        {
+            lock (candado)
+            {
+                return CopiasSeguridad.Listar(rutaBase).Select(ruta =>
+                {
+                    FileInfo info = new FileInfo(ruta);
+                    return new CopiaDto
+                    {
+                        Nombre = info.Name,
+                        Fecha = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
+                        Kilobytes = (info.Length + 1023) / 1024
+                    };
+                }).ToList();
+            }
+        }
+
+        // Copia manual (además de la diaria que se hace sola al guardar)
+        public CopiaDto CrearCopia()
+        {
+            lock (candado)
+            {
+                if (!File.Exists(rutaBase))
+                {
+                    throw new ErrorPanel("No hay base de datos para copiar.", 404);
+                }
+                string carpeta = Path.Combine(Path.GetDirectoryName(rutaBase) ?? "", "copias");
+                Directory.CreateDirectory(carpeta);
+                string nombre = Path.GetFileNameWithoutExtension(rutaBase) + "-manual-"
+                    + DateTime.Now.ToString("yyyyMMdd-HHmmss") + Path.GetExtension(rutaBase);
+                string destino = Path.Combine(carpeta, nombre);
+                File.Copy(rutaBase, destino, false);
+                FileInfo info = new FileInfo(destino);
+                return new CopiaDto { Nombre = info.Name, Fecha = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm"), Kilobytes = (info.Length + 1023) / 1024 };
+            }
+        }
+
+        // Reemplaza todo (ventas y catálogo) por el contenido de la copia; lo actual se resguarda antes.
+        public void RestaurarCopia(RestauracionDto datos)
+        {
+            if (datos == null || string.IsNullOrWhiteSpace(datos.Nombre))
+            {
+                throw new ErrorPanel("Elegí una copia.");
+            }
+            if ((datos.Confirmacion ?? "").Trim().ToUpperInvariant() != "RESTAURAR")
+            {
+                throw new ErrorPanel("Para restaurar tenés que escribir RESTAURAR.");
+            }
+            lock (candado)
+            {
+                // Solo se aceptan nombres de la lista (nunca una ruta armada por el pedido)
+                string copia = CopiasSeguridad.Listar(rutaBase)
+                    .FirstOrDefault(r => string.Equals(Path.GetFileName(r), datos.Nombre, StringComparison.Ordinal));
+                if (copia == null)
+                {
+                    throw new ErrorPanel("Esa copia no existe.", 404);
+                }
+                try
+                {
+                    RepositorioSqlite.CargarVentas(copia);
+                    RepositorioSqlite.CargarProductos(copia);
+                }
+                catch (Exception)
+                {
+                    throw new ErrorPanel("Esa copia no se puede leer. No se cambió nada.", 409);
+                }
+                CopiasSeguridad.Restaurar(copia, rutaBase);
+            }
+        }
+
+        // ---------- Exportar para Excel (CSV con ; y coma decimal) ----------
+
+        public byte[] CsvMensual()
+        {
+            lock (candado)
+            {
+                List<FilaMes> filas = Reportes.PorMes(Ventas());
+                return ArchivoTemporal(ruta => Reportes.ExportarMensual(filas, ruta));
+            }
+        }
+
+        public byte[] CsvProductos(int orden)
+        {
+            if (orden < 1 || orden > 3)
+            {
+                orden = 1;
+            }
+            lock (candado)
+            {
+                List<FilaProducto> filas = Reportes.PorProducto(Ventas(), (OrdenProductos)orden);
+                return ArchivoTemporal(ruta => Reportes.ExportarProductos(filas, ruta));
+            }
+        }
+
+        public byte[] CsvVentas()
+        {
+            lock (candado)
+            {
+                List<Venta> ventas = Ventas();
+                return ArchivoTemporal(ruta => ArchivoVentas.Guardar(ventas, ruta));
+            }
+        }
+
+        private static byte[] ArchivoTemporal(Action<string> escribir)
+        {
+            string ruta = Path.Combine(Path.GetTempPath(), "mateverso-" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                escribir(ruta);
+                return File.ReadAllBytes(ruta);
+            }
+            finally
+            {
+                if (File.Exists(ruta))
+                {
+                    File.Delete(ruta);
+                }
             }
         }
 

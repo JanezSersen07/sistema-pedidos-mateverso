@@ -89,6 +89,7 @@ app.MapGet("/api/ventas", (string texto, string desde, string hasta, int? estado
 app.MapGet("/api/ventas/{numero:int}", (int numero) => servicio.ObtenerVenta(numero));
 app.MapPost("/api/ventas", (VentaNuevaDto datos) =>
     Results.Json(servicio.CrearVenta(datos), statusCode: 201));
+app.MapPut("/api/ventas/{numero:int}", (int numero, VentaEdicionDto datos) => servicio.EditarVenta(numero, datos));
 app.MapPut("/api/ventas/{numero:int}/estado", (int numero, CambioEstado cambio) =>
     servicio.CambiarEstado(numero, cambio.Estado));
 app.MapDelete("/api/ventas/{numero:int}", (int numero) =>
@@ -106,6 +107,28 @@ app.MapDelete("/api/productos/{id:int}", (int id) =>
 {
     servicio.EliminarProducto(id);
     return Results.NoContent();
+});
+
+// ---------- Copias de seguridad ----------
+app.MapGet("/api/copias", () => servicio.ListarCopias());
+app.MapPost("/api/copias", () => Results.Json(servicio.CrearCopia(), statusCode: 201));
+app.MapPost("/api/copias/restaurar", (RestauracionDto datos) =>
+{
+    servicio.RestaurarCopia(datos);
+    return Results.NoContent();
+});
+
+// ---------- Descargas para Excel ----------
+app.MapGet("/api/exportar/{que}", (string que, int? orden) =>
+{
+    string fecha = DateTime.Today.ToString("yyyy-MM-dd");
+    switch (que)
+    {
+        case "mensual": return Results.File(servicio.CsvMensual(), "text/csv; charset=utf-8", "reporte-mensual-" + fecha + ".csv");
+        case "productos": return Results.File(servicio.CsvProductos(orden ?? 1), "text/csv; charset=utf-8", "reporte-productos-" + fecha + ".csv");
+        case "ventas": return Results.File(servicio.CsvVentas(), "text/csv; charset=utf-8", "ventas-" + fecha + ".csv");
+        default: throw new ErrorPanel("Esa descarga no existe.", 404);
+    }
 });
 
 app.MapFallback("/api/{**ruta}", () => Results.Json(new { error = "Esa dirección de la API no existe." }, statusCode: 404));
