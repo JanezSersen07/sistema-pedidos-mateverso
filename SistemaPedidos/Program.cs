@@ -11,8 +11,7 @@ namespace SistemaPedidos
     {
         static RegistroVentas registro;
         static CatalogoProductos catalogo;
-        static string rutaDatos;
-        static string rutaProductos;
+        static string rutaBase;
  
         static void Main(string[] args)
         {
@@ -21,32 +20,41 @@ namespace SistemaPedidos
             // Los datos se guardan en Documentos\Mateverso, fuera del proyecto,
             // así nunca se suben a GitHub por accidente.
             string documentos = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            rutaDatos = Path.Combine(documentos, "Mateverso", "ventas.csv");
-            rutaProductos = Path.Combine(documentos, "Mateverso", "productos.csv");
- 
+            rutaBase = Path.Combine(documentos, "Mateverso", "mateverso.db");
+
+            // Los CSV son de las versiones anteriores. Si todavía no existe la base de datos,
+            // se pasan a ella una única vez (los CSV quedan intactos, de respaldo).
+            string csvVentas = Path.Combine(documentos, "Mateverso", "ventas.csv");
+            string csvProductos = Path.Combine(documentos, "Mateverso", "productos.csv");
             try
             {
-                registro = new RegistroVentas(ArchivoVentas.Cargar(rutaDatos));
+                string migracion = Migracion.SiHaceFalta(rutaBase, csvVentas, csvProductos);
+                if (migracion != null)
+                {
+                    Console.WriteLine(migracion);
+                    Console.WriteLine();
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("No pude leer el archivo de ventas: " + ex.Message);
-                Console.WriteLine("Revisalo (" + rutaDatos + ") antes de seguir, para no pisar tus datos.");
-                return;
-            }
- 
-            try
-            {
-                catalogo = new CatalogoProductos(ArchivoProductos.Cargar(rutaProductos));
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("No pude leer el archivo de productos: " + ex.Message);
-                Console.WriteLine("Revisalo (" + rutaProductos + ") antes de seguir, para no pisar tus datos.");
+                Console.WriteLine("No pude pasar tus datos a la base de datos: " + ex.Message);
+                Console.WriteLine("No se cambió nada. Revisá los archivos en " + Path.GetDirectoryName(rutaBase) + " antes de seguir.");
                 return;
             }
 
-            Console.WriteLine("Datos: " + rutaDatos);
+            try
+            {
+                registro = new RegistroVentas(RepositorioSqlite.CargarVentas(rutaBase));
+                catalogo = new CatalogoProductos(RepositorioSqlite.CargarProductos(rutaBase));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("No pude leer la base de datos: " + ex.Message);
+                Console.WriteLine("Revisala (" + rutaBase + ") antes de seguir, para no pisar tus datos.");
+                return;
+            }
+
+            Console.WriteLine("Datos: " + rutaBase);
             Console.WriteLine("Ventas cargadas: " + registro.Cantidad);
             Console.WriteLine("Productos en el catálogo: " + catalogo.Cantidad);
             Console.WriteLine();
@@ -1290,29 +1298,25 @@ namespace SistemaPedidos
         static void MenuCopias()
         {
             Console.WriteLine("--- COPIAS DE SEGURIDAD ---");
-            Console.WriteLine("Se guarda una copia por día, automática, en Documentos\\Mateverso\\copias");
-            Console.WriteLine("(las últimas 30 de cada archivo).");
-            Console.WriteLine("1. Restaurar ventas");
-            Console.WriteLine("2. Restaurar catálogo de productos");
+            Console.WriteLine("Se guarda una copia de la base de datos por día, automática,");
+            Console.WriteLine("en Documentos\\Mateverso\\copias (las últimas 30).");
+            Console.WriteLine("Cada copia tiene las ventas y el catálogo juntos.");
+            Console.WriteLine("1. Restaurar una copia");
             Console.WriteLine("0. Volver");
             int opcion = LeerEntero("Opción: ");
             Console.WriteLine();
             if (opcion == 1)
             {
-                Restaurar(rutaDatos, "ventas");
-            }
-            else if (opcion == 2)
-            {
-                Restaurar(rutaProductos, "catálogo");
+                Restaurar();
             }
         }
 
-        static void Restaurar(string ruta, string que)
+        static void Restaurar()
         {
-            List<string> copias = CopiasSeguridad.Listar(ruta);
+            List<string> copias = CopiasSeguridad.Listar(rutaBase);
             if (copias.Count == 0)
             {
-                Console.WriteLine("Todavía no hay copias de " + que + ". Se crean solas al guardar.");
+                Console.WriteLine("Todavía no hay copias. Se crean solas al guardar.");
                 return;
             }
 
@@ -1332,14 +1336,8 @@ namespace SistemaPedidos
             // Se comprueba que la copia se pueda leer antes de tocar nada
             try
             {
-                if (que == "ventas")
-                {
-                    ArchivoVentas.Cargar(copia);
-                }
-                else
-                {
-                    ArchivoProductos.Cargar(copia);
-                }
+                RepositorioSqlite.CargarVentas(copia);
+                RepositorioSqlite.CargarProductos(copia);
             }
             catch (Exception ex)
             {
@@ -1347,7 +1345,7 @@ namespace SistemaPedidos
                 return;
             }
 
-            Console.Write("Esto reemplaza lo que hay ahora (" + que + "); lo actual se resguarda antes. Escribí RESTAURAR para seguir: ");
+            Console.Write("Esto reemplaza todo lo que hay ahora (ventas y catálogo); lo actual se resguarda antes. Escribí RESTAURAR para seguir: ");
             string respuesta = Console.ReadLine();
             if (respuesta == null || respuesta.Trim().ToUpperInvariant() != "RESTAURAR")
             {
@@ -1357,17 +1355,10 @@ namespace SistemaPedidos
 
             try
             {
-                CopiasSeguridad.Restaurar(copia, ruta);
-                if (que == "ventas")
-                {
-                    registro = new RegistroVentas(ArchivoVentas.Cargar(rutaDatos));
-                    Console.WriteLine("Listo: " + registro.Cantidad + " ventas restauradas.");
-                }
-                else
-                {
-                    catalogo = new CatalogoProductos(ArchivoProductos.Cargar(rutaProductos));
-                    Console.WriteLine("Listo: " + catalogo.Cantidad + " productos restaurados.");
-                }
+                CopiasSeguridad.Restaurar(copia, rutaBase);
+                registro = new RegistroVentas(RepositorioSqlite.CargarVentas(rutaBase));
+                catalogo = new CatalogoProductos(RepositorioSqlite.CargarProductos(rutaBase));
+                Console.WriteLine("Listo: " + registro.Cantidad + " ventas y " + catalogo.Cantidad + " productos restaurados.");
             }
             catch (Exception ex)
             {
@@ -1379,13 +1370,13 @@ namespace SistemaPedidos
         {
             try
             {
-                CopiasSeguridad.CopiaDelDia(rutaProductos);
-                ArchivoProductos.Guardar(catalogo.Productos, rutaProductos);
+                CopiasSeguridad.CopiaDelDia(rutaBase);
+                RepositorioSqlite.GuardarProductos(catalogo.Productos, rutaBase);
             }
-            catch (IOException ex)
+            catch (Exception ex)
             {
                 Console.WriteLine("¡Ojo! No se pudo guardar el catálogo: " + ex.Message);
-                Console.WriteLine("Si tenés el archivo abierto en Excel, cerralo.");
+                Console.WriteLine("No se cambió nada en la base de datos. Si otro programa la tiene abierta, cerralo.");
             }
         }
 
@@ -1393,13 +1384,13 @@ namespace SistemaPedidos
         {
             try
             {
-                CopiasSeguridad.CopiaDelDia(rutaDatos);
-                ArchivoVentas.Guardar(registro.Ventas, rutaDatos);
+                CopiasSeguridad.CopiaDelDia(rutaBase);
+                RepositorioSqlite.GuardarVentas(registro.Ventas, rutaBase);
             }
-            catch (IOException ex)
+            catch (Exception ex)
             {
                 Console.WriteLine("¡Ojo! No se pudo guardar: " + ex.Message);
-                Console.WriteLine("Si tenés el archivo abierto en Excel, cerralo.");
+                Console.WriteLine("No se cambió nada en la base de datos. Si otro programa la tiene abierta, cerralo.");
             }
         }
     }

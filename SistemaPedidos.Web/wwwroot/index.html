@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel Mateverso</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <div class="app">
+    <nav class="menu" aria-label="Secciones">
+      <div class="marca">Mateverso<span>panel de ventas</span></div>
+      <a href="#/resumen" data-ruta="resumen">Resumen</a>
+      <a href="#/ventas" data-ruta="ventas">Ventas</a>
+      <a href="#/catalogo" data-ruta="catalogo">Catálogo</a>
+      <a href="#/reportes" data-ruta="reportes">Reportes</a>
+      <p class="aviso-menu">Cerrá el sistema de consola mientras usás el panel, y al revés.</p>
+    </nav>
+    <main id="contenido" tabindex="-1"></main>
+  </div>
+
+  <dialog id="dialogo"></dialog>
+  <div id="aviso" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

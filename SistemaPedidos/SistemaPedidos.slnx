@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="SistemaPedidos.csproj" />
+  <Project Path="../SistemaPedidos.Web/SistemaPedidos.Web.csproj" />
   <Project Path="../SistemaPedidos.Tests/SistemaPedidos.Tests.csproj" />
 </Solution>

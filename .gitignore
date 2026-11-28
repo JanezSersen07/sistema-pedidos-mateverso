@@ -435,3 +435,8 @@ copia-ventas*.csv
 
 # Catálogo de productos con costos: nunca se sube
 productos*.csv
+
+# Datos del programa (nunca se suben)
+mateverso.db
+mateverso.db.nueva
+copias/

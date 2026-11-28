@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <!-- Usa el mismo código del sistema de consola (modelos, SQLite, reportes), menos su Program.cs -->
+  <ItemGroup>
+    <Compile Include="..\SistemaPedidos\*.cs" Exclude="..\SistemaPedidos\Program.cs" LinkBase="Compartido" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>
